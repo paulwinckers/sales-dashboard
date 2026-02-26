@@ -46,6 +46,14 @@ h3 { margin: 0 0 10px 0; font-size: 14px; color: #d1d5db; }
   border-radius: 14px;
 }
 
+.bottomPanel { margin-bottom: 24px; }
+
+.sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
 .controls {
   display: flex;
   gap: 10px;
@@ -130,6 +138,7 @@ h3 { margin: 0 0 10px 0; font-size: 14px; color: #d1d5db; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  margin-bottom: 12px;
 }
 @media (max-width: 1000px) {
   .charts { grid-template-columns: 1fr; }
