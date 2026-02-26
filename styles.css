@@ -141,7 +141,7 @@ h3 { margin: 0 0 10px 0; font-size: 14px; color: #d1d5db; }
   padding: 12px;
 }
 
-/* Fixed canvas height prevents Chart.js resize/reflow loops */
+/* Prevent Chart.js resize/reflow loops */
 .chartCard canvas{
   width: 100% !important;
   height: 300px !important;
