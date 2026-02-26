@@ -11,8 +11,7 @@
     <div>
       <h1>Sales & Ops Dashboard</h1>
       <div class="sub">
-        Sources: <code>targets.csv</code>, <code>pipeline.csv</code>, <code>work_tickets.xlsx</code>
-        <span class="muted">Last refresh: <span id="lastRefresh">—</span></span>
+        Data from <code>/data</code> folder • Last refresh: <span id="lastRefresh">—</span>
       </div>
     </div>
 
@@ -42,7 +41,7 @@
         <div class="cardTitle">Targets</div>
         <div class="cardBody">
           <div class="row">
-            <code>./data/targets.csv</code>
+            <code id="targetsPath">—</code>
             <span id="targetsStatus" class="pill">—</span>
           </div>
         </div>
@@ -52,7 +51,7 @@
         <div class="cardTitle">Pipeline</div>
         <div class="cardBody">
           <div class="row">
-            <code>./data/pipeline.csv</code>
+            <code id="pipelinePath">—</code>
             <span id="pipelineStatus" class="pill">—</span>
           </div>
         </div>
@@ -62,7 +61,7 @@
         <div class="cardTitle">Work Tickets</div>
         <div class="cardBody">
           <div class="row">
-            <code>./data/work_tickets.xlsx</code>
+            <code id="ticketsPath">—</code>
             <span id="ticketsStatus" class="pill">—</span>
           </div>
         </div>
@@ -70,7 +69,7 @@
     </div>
 
     <div class="hint">
-      On GitHub Pages: update weekly by replacing files inside the <code>data/</code> folder and committing.
+      Weekly update: replace files in the GitHub repo <code>data/</code> folder and commit.
     </div>
   </section>
 
@@ -82,7 +81,7 @@
         <h3>Revenue Target vs Pipeline (Year)</h3>
         <canvas id="chartRevenueYear"></canvas>
         <div class="hint">
-          Pipeline $: Unweighted uses <b>Estimated $</b>. Weighted uses <b>Weighted Pipeline</b>.
+          Pipeline $ Unweighted = <b>Estimated $</b>. Weighted = <b>Weighted Pipeline</b>.
         </div>
       </div>
 
@@ -90,7 +89,7 @@
         <h3>Tracking This Month (Target vs Actual)</h3>
         <canvas id="chartMonthTracking"></canvas>
         <div class="hint">
-          Actuals are entered below and saved in this browser.
+          Enter actuals below (stored in your browser).
         </div>
       </div>
     </div>
@@ -99,8 +98,7 @@
   <section class="panel">
     <h2>Actuals Input (stored in this browser)</h2>
     <div class="hint">
-      Enter actuals for the selected month. Saved to your browser (localStorage).
-      Use Export/Import to move to another computer.
+      Save actuals for the selected month. Use Export/Import if you want to move actuals to another device.
     </div>
 
     <div class="actuals">
@@ -146,23 +144,25 @@
 
   <section class="panel">
     <h2>Hours by Month</h2>
+
     <div class="charts">
-      <div class="chartCard" id="chartCardConstruction">
+      <div class="chartCard">
         <h3>Construction Hours</h3>
         <canvas id="chartConstruction"></canvas>
       </div>
 
-      <div class="chartCard" id="chartCardMaintenance">
+      <div class="chartCard">
         <h3>Maintenance Hours</h3>
         <canvas id="chartMaintenance"></canvas>
       </div>
     </div>
+
     <div class="hint">
-      Target is a <b>line</b>. Bars <b>stack</b>: Work Tickets (Open/Scheduled) + Pipeline Weighted Hours (excludes won).
+      Target is a <b>line</b>. Bars are <b>stacked</b>: Work Tickets (Open/Scheduled) + Opportunities (Pipeline Weighted Hours, excludes Won).
     </div>
   </section>
 
-  <!-- Libraries -->
+  <!-- Libraries (must be BEFORE app.js) -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
