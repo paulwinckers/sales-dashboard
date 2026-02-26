@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sales & Ops Dashboard</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div>
+      <h1>Sales & Ops Dashboard</h1>
+      <div class="sub">
+        Sources: <code>targets.csv</code>, <code>pipeline.csv</code>, <code>work_tickets.xlsx</code>
+        <span class="muted">Last refresh: <span id="lastRefresh">—</span></span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label class="control">
+        <span>View</span>
+        <select id="viewToggle">
+          <option value="all">All</option>
+          <option value="construction">Construction</option>
+          <option value="maintenance">Maintenance</option>
+        </select>
+      </label>
+
+      <label class="control">
+        <span>Month</span>
+        <select id="asOfMonth"></select>
+      </label>
+
+      <button id="refreshBtn" class="btn">Refresh</button>
+    </div>
+  </header>
+
+  <section class="panel">
+    <h2>Data Status</h2>
+    <div class="grid3">
+      <div class="card">
+        <div class="cardTitle">Targets</div>
+        <div class="cardBody">
+          <div class="row">
+            <code>./data/targets.csv</code>
+            <span id="targetsStatus" class="pill">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="cardTitle">Pipeline</div>
+        <div class="cardBody">
+          <div class="row">
+            <code>./data/pipeline.csv</code>
+            <span id="pipelineStatus" class="pill">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="cardTitle">Work Tickets</div>
+        <div class="cardBody">
+          <div class="row">
+            <code>./data/work_tickets.xlsx</code>
+            <span id="ticketsStatus" class="pill">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint">
+      On GitHub Pages: update weekly by replacing files inside the <code>data/</code> folder and committing.
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>KPI Charts</h2>
+
+    <div class="charts">
+      <div class="chartCard">
+        <h3>Revenue Target vs Pipeline (Year)</h3>
+        <canvas id="chartRevenueYear"></canvas>
+        <div class="hint">
+          Pipeline $: Unweighted uses <b>Estimated $</b>. Weighted uses <b>Weighted Pipeline</b>.
+        </div>
+      </div>
+
+      <div class="chartCard">
+        <h3>Tracking This Month (Target vs Actual)</h3>
+        <canvas id="chartMonthTracking"></canvas>
+        <div class="hint">
+          Actuals are entered below and saved in this browser.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Actuals Input (stored in this browser)</h2>
+    <div class="hint">
+      Enter actuals for the selected month. Saved to your browser (localStorage).
+      Use Export/Import to move to another computer.
+    </div>
+
+    <div class="actuals">
+      <div class="actualsCol">
+        <h3>Construction</h3>
+        <label class="control">
+          <span>Actual Revenue</span>
+          <input id="actConstrRev" type="number" step="0.01" placeholder="e.g., 125000" />
+        </label>
+        <label class="control">
+          <span>Actual Hours</span>
+          <input id="actConstrHrs" type="number" step="0.01" placeholder="e.g., 820" />
+        </label>
+      </div>
+
+      <div class="actualsCol">
+        <h3>Maintenance</h3>
+        <label class="control">
+          <span>Actual Revenue</span>
+          <input id="actMaintRev" type="number" step="0.01" placeholder="e.g., 98000" />
+        </label>
+        <label class="control">
+          <span>Actual Hours</span>
+          <input id="actMaintHrs" type="number" step="0.01" placeholder="e.g., 4100" />
+        </label>
+      </div>
+
+      <div class="actualsActions">
+        <button id="saveActualsBtn" class="btn">Save Actuals for Month</button>
+        <button id="exportActualsBtn" class="btn secondary">Export Actuals JSON</button>
+        <label class="btn secondary fileBtn">
+          Import Actuals JSON
+          <input id="importActualsInput" type="file" accept=".json" hidden />
+        </label>
+        <button id="clearActualsBtn" class="btn danger">Clear All Actuals</button>
+
+        <div class="tiny muted">
+          Current month actuals loaded: <span id="actualsLoaded">—</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Hours by Month</h2>
+    <div class="charts">
+      <div class="chartCard" id="chartCardConstruction">
+        <h3>Construction Hours</h3>
+        <canvas id="chartConstruction"></canvas>
+      </div>
+
+      <div class="chartCard" id="chartCardMaintenance">
+        <h3>Maintenance Hours</h3>
+        <canvas id="chartMaintenance"></canvas>
+      </div>
+    </div>
+    <div class="hint">
+      Target is a <b>line</b>. Bars <b>stack</b>: Work Tickets (Open/Scheduled) + Pipeline Weighted Hours (excludes won).
+    </div>
+  </section>
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script src="./app.js"></script>
+</body>
+</html>
