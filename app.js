@@ -570,13 +570,15 @@ function renderAll(state) {
 // ----------------------------
 async function loadAllData(state) {
   // Targets
-  try {
-    state.targets = await loadTargets(DEFAULT_FILES.targetsCsv);
-    setPill(document.getElementById("targetsStatus"), true, `Loaded (${state.targets.monthKeys.length} months)`);
-    populateAsOfMonthSelect(state.targets.monthKeys);
-  } catch (e) {
-    console.error(e);
-    setPill(document.getElementById("targetsStatus"), false, "Missing/Failed");
+ try {
+  state.tickets = await loadWorkTickets(DEFAULT_FILES.workTicketsXlsx);
+  setPill(document.getElementById("ticketsStatus"), true, `Loaded (${state.tickets.length})`);
+} catch (e) {
+  console.error("Work tickets failed:", e);
+  state.tickets = [];
+  const msg = (e && e.message) ? e.message : String(e);
+  setPill(document.getElementById("ticketsStatus"), false, `Failed: ${msg}`);
+}
     throw e;
   }
 
@@ -677,4 +679,5 @@ function wireControls(state) {
 
   await loadAllData(state);
   renderAll(state);
+
 })();
