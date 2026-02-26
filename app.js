@@ -217,7 +217,7 @@ async function loadWorkTickets(url) {
   const wb = XLSX.read(arrayBuffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
-
+  console.log("XLSX raw rows:", json.length, "first row:", json[0]);
   const sample = json[0] || {};
   const keys = Object.keys(sample);
   const norm = (s) =>
@@ -600,6 +600,7 @@ async function loadAllData(state) {
     console.error(e);
     state.tickets = [];
     setPill(document.getElementById("ticketsStatus"), false, "Missing/Failed");
+    console.log("Work tickets loaded:", state.tickets.length, state.tickets.slice(0,3));
   }
 
   // Actuals inputs
@@ -681,3 +682,4 @@ function wireControls(state) {
   renderAll(state);
 
 })();
+
