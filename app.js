@@ -1,90 +1,70 @@
 // ----------------------------
 // GitHub Pages-safe absolute URLs to /data/*
 // ----------------------------
-const BASE = new URL(".", window.location.href).href; // always ends with "/"
+const BASE = new URL(".", window.location.href).href;
 const DEFAULT_FILES = {
   targetsCsv: new URL("data/targets.csv", BASE).toString(),
   pipelineCsv: new URL("data/pipeline.csv", BASE).toString(),
   workTicketsXlsx: new URL("data/work_tickets.xlsx", BASE).toString(),
 };
 
-// Status words
 const TICKET_ACTIVE_STATUS_WORDS = ["open", "scheduled"];
 const WON_STATUS_WORDS = ["won", "closed won", "sold"];
 
 // ----------------------------
 // Helpers
 // ----------------------------
-function setPathAndPill(pathEl, pillEl, ok, text) {
-  pathEl.textContent = text.path;
-  pillEl.textContent = text.status;
-  pillEl.style.background = ok ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)";
-}
-
 function isConstructionDivision(name) {
   return String(name || "").toLowerCase().includes("construction");
 }
-
 function isMaintenanceDivision(name) {
   const s = String(name || "").toLowerCase();
   return s.includes("maintenance") || s.includes("irrigation") || s.includes("lighting");
 }
-
 function isTicketActive(status) {
   const s = String(status || "").trim().toLowerCase();
   return TICKET_ACTIVE_STATUS_WORDS.some(w => s.includes(w));
 }
-
 function isWonPipelineStatus(status) {
   const s = String(status || "").trim().toLowerCase();
   return WON_STATUS_WORDS.some(w => s.includes(w));
 }
-
 function parseCurrency(v) {
   if (v == null) return 0;
   const s = String(v).replace(/[\s,$]/g, "");
   const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 }
-
 function parseNumberLoose(v) {
   if (v == null) return 0;
   const s = String(v).replace(/[\s,]/g, "");
   const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 }
-
 function parseDateAny(v) {
   if (!v) return null;
   if (v instanceof Date && Number.isFinite(v.getTime())) return v;
 
   const s = String(v).trim();
 
-  // ISO: YYYY-MM-DD
+  // ISO YYYY-MM-DD
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) {
-    const yy = Number(m[1]);
-    const mm = Number(m[2]) - 1;
-    const dd = Number(m[3]);
-    const d = new Date(yy, mm, dd);
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     return Number.isFinite(d.getTime()) ? d : null;
   }
 
-  // US: MM/DD/YY or MM/DD/YYYY
+  // MM/DD/YY or MM/DD/YYYY
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
   if (m) {
-    const mm = Number(m[1]) - 1;
-    const dd = Number(m[2]);
     let yy = Number(m[3]);
     if (m[3].length === 2) yy += 2000;
-    const d = new Date(yy, mm, dd);
+    const d = new Date(yy, Number(m[1]) - 1, Number(m[2]));
     return Number.isFinite(d.getTime()) ? d : null;
   }
 
   return null;
 }
-
-// Excel date serials
 function parseExcelDate(v) {
   if (!v) return null;
   if (v instanceof Date && Number.isFinite(v.getTime())) return v;
@@ -94,16 +74,11 @@ function parseExcelDate(v) {
     if (!o) return null;
     return new Date(o.y, o.m - 1, o.d);
   }
-
   return parseDateAny(v);
 }
-
 function monthKeyFromDate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
-
 function monthKeyFromTargetsLabel(label) {
   const s = String(label || "").trim();
 
@@ -126,7 +101,6 @@ function monthKeyFromTargetsLabel(label) {
 
   return null;
 }
-
 async function fetchText(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Fetch failed ${res.status} for ${url}`);
@@ -142,7 +116,7 @@ async function loadTargets(url) {
   const parsed = Papa.parse(text, {
     header: true,
     skipEmptyLines: true,
-    delimiter: "", // auto detect (tab or comma)
+    delimiter: "", // auto detect tab/comma
     transformHeader: h => String(h || "").trim(),
   });
 
@@ -209,7 +183,6 @@ async function loadWorkTickets(url) {
   const sample = json[0] || {};
   const keys = Object.keys(sample);
 
-  // normalize header keys (remove periods + collapse spaces)
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
   const pick = (...candidates) => {
     const cand = candidates.map(norm);
@@ -220,7 +193,7 @@ async function loadWorkTickets(url) {
   // Your headers: Status, Sched Date, Est Hrs, Division
   const COL_STATUS = pick("status", "abr status", "ticket status", "work status");
   const COL_DATE   = pick("sched date", "scheduled date", "schedule date", "start date", "due date", "date");
-  const COL_HRS    = pick("est hrs", "est h", "estimated hours", "hours", "labor hours", "est hrs");
+  const COL_HRS    = pick("est hrs", "estimated hours", "hours", "labor hours");
   const COL_DIV    = pick("division", "division name", "department", "service");
 
   return json.map(r => ({
@@ -234,7 +207,7 @@ async function loadWorkTickets(url) {
 // ----------------------------
 // Actuals (localStorage)
 // ----------------------------
-const ACTUALS_KEY = "dashboard_actuals_v2";
+const ACTUALS_KEY = "dashboard_actuals_v3";
 
 function loadActualsStore() {
   try {
@@ -244,15 +217,12 @@ function loadActualsStore() {
     return {};
   }
 }
-
 function saveActualsStore(store) {
   localStorage.setItem(ACTUALS_KEY, JSON.stringify(store));
 }
-
 function getActualsForMonth(store, mk) {
   return store[mk] || { constrRev: 0, constrHrs: 0, maintRev: 0, maintHrs: 0 };
 }
-
 function setActualsForMonth(store, mk, vals) {
   store[mk] = {
     constrRev: Number(vals.constrRev || 0),
@@ -261,7 +231,6 @@ function setActualsForMonth(store, mk, vals) {
     maintHrs: Number(vals.maintHrs || 0),
   };
 }
-
 function loadMonthActualsIntoInputs(store, mk) {
   const a = getActualsForMonth(store, mk);
 
@@ -281,6 +250,8 @@ let chartConstr = null;
 let chartMaint = null;
 let chartRevenueYear = null;
 let chartMonthTracking = null;
+let chartRevenuePace = null;
+let chartMonthProgress = null;
 
 function destroy(chart) { if (chart) chart.destroy(); return null; }
 
@@ -297,7 +268,6 @@ function bucketSumByMonth(items, getDate, getValue, monthKeys) {
   }
   return out;
 }
-
 function sumMonths(seriesByMonth, monthKeys) {
   return monthKeys.reduce((acc, k) => acc + (seriesByMonth[k] || 0), 0);
 }
@@ -307,43 +277,17 @@ function buildHoursChart(canvas, labels, targetLine, barsTickets, barsPipeline) 
     data: {
       labels,
       datasets: [
-        {
-          type: "line",
-          label: "Target Hours",
-          data: targetLine,
-          borderWidth: 2,
-          pointRadius: 2,
-          tension: 0.2,
-          yAxisID: "y",
-        },
-        {
-          type: "bar",
-          label: "Work Tickets (Open/Scheduled)",
-          data: barsTickets,
-          stack: "stack1",
-          yAxisID: "y",
-        },
-        {
-          type: "bar",
-          label: "Opportunities (Pipeline Weighted Hours)",
-          data: barsPipeline,
-          stack: "stack1",
-          yAxisID: "y",
-        },
+        { type: "line", label: "Target Hours", data: targetLine, borderWidth: 2, pointRadius: 2, tension: 0.2 },
+        { type: "bar", label: "Work Tickets (Open/Scheduled)", data: barsTickets, stack: "stack1" },
+        { type: "bar", label: "Opportunities (Pipeline Weighted Hours)", data: barsPipeline, stack: "stack1" },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      plugins: {
-        legend: { position: "top" },
-        tooltip: { mode: "index", intersect: false },
-      },
-      scales: {
-        x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
-      },
+      plugins: { legend: { position: "top" }, tooltip: { mode: "index", intersect: false } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
     },
   });
 }
@@ -359,13 +303,7 @@ function buildRevenueYearChart(canvas, target, pipeUnweighted, pipeWeighted) {
         { label: "Pipeline $ (Weighted)", data: [pipeWeighted] },
       ],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: { legend: { position: "top" } },
-      scales: { y: { beginAtZero: true } },
-    },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
   });
 }
 
@@ -373,19 +311,42 @@ function buildMonthTrackingChart(canvas, targetVals, actualVals) {
   return new Chart(canvas.getContext("2d"), {
     type: "bar",
     data: {
-      labels: ["Revenue", "Hours"],
+      labels: ["Revenue (MTD)", "Hours (MTD)"],
       datasets: [
-        { label: "Target", data: targetVals },
-        { label: "Actual", data: actualVals },
+        { label: "Target (Full Month)", data: targetVals },
+        { label: "Actual (MTD)", data: actualVals },
       ],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: { legend: { position: "top" } },
-      scales: { y: { beginAtZero: true } },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
+  });
+}
+
+function buildRevenuePaceChart(canvas, targetMonthRev, actualMtdRev, projectedFullMonthRev) {
+  return new Chart(canvas.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: ["Revenue"],
+      datasets: [
+        { label: "Target (Full Month)", data: [targetMonthRev] },
+        { label: "Actual (MTD)", data: [actualMtdRev] },
+        { label: "Projected (Full Month)", data: [projectedFullMonthRev] },
+      ],
     },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
+  });
+}
+
+function buildMonthProgressChart(canvas, targetMonthRev, actualMtdRev, targetMonthHrs, actualMtdHrs) {
+  return new Chart(canvas.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: ["Revenue", "Hours"],
+      datasets: [
+        { label: "Target (Full Month)", data: [targetMonthRev, targetMonthHrs] },
+        { label: "Actual (MTD)", data: [actualMtdRev, actualMtdHrs] },
+      ],
+    },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
   });
 }
 
@@ -394,6 +355,7 @@ function buildMonthTrackingChart(canvas, targetVals, actualVals) {
 // ----------------------------
 function populateMonthSelect(monthKeys) {
   const sel = document.getElementById("asOfMonth");
+  const prior = sel.value;
   sel.innerHTML = "";
   for (const mk of monthKeys) {
     const opt = document.createElement("option");
@@ -401,7 +363,8 @@ function populateMonthSelect(monthKeys) {
     opt.textContent = mk;
     sel.appendChild(opt);
   }
-  sel.value = monthKeys[monthKeys.length - 1];
+  // keep selection if possible
+  sel.value = monthKeys.includes(prior) ? prior : monthKeys[monthKeys.length - 1];
 }
 
 function getScope(view) {
@@ -439,16 +402,49 @@ function getScope(view) {
   };
 }
 
-function renderAll(state) {
-  const view = document.getElementById("viewToggle").value;
-  const mk = document.getElementById("asOfMonth").value;
-  const scope = getScope(view);
+function projectionForMonth(mk, actualMtd) {
+  // If selected month is the current month, project based on day-of-month.
+  // Otherwise (past/future), just return actualMtd (no projection).
+  const now = new Date();
+  const currentMk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  if (mk !== currentMk) return actualMtd;
 
+  const day = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  if (day <= 0) return actualMtd;
+
+  return (actualMtd / day) * daysInMonth;
+}
+
+function renderAll(state) {
+  // ensure selects exist
+  if (!state.targets?.monthKeys?.length) return;
+
+  const viewSel = document.getElementById("viewToggle");
+  const monthSel = document.getElementById("asOfMonth");
+
+  const view = viewSel.value || "all";
+  const mk = monthSel.value || state.targets.monthKeys[state.targets.monthKeys.length - 1];
+
+  const scope = getScope(view);
   const monthKeys = state.targets.monthKeys;
 
-  // Work ticket and pipeline buckets
+  // --- Actuals (MTD) ---
+  const actualsStore = loadActualsStore();
+  const a = getActualsForMonth(actualsStore, mk);
+  const actualMtdRev = scope.actualMonthRev(a);
+  const actualMtdHrs = scope.actualMonthHrs(a);
+
+  // --- Targets (Full Month) ---
+  const targetMonthRev = scope.targetMonthRev(state.targets, mk);
+  const targetMonthHrs = scope.targetMonthHrs(state.targets, mk);
+
+  // --- Revenue Pace projection ---
+  const projectedRev = projectionForMonth(mk, actualMtdRev);
+
+  // --- Hours by month (Construction + Maintenance always shown) ---
   const activeTickets = state.tickets.filter(t => isTicketActive(t.status));
-  const pipePotential = state.pipeline.filter(p => !isWonPipelineStatus(p.status)); // exclude won for hours chart
+  const pipePotential = state.pipeline.filter(p => !isWonPipelineStatus(p.status));
 
   const ticketConstr = bucketSumByMonth(
     activeTickets.filter(t => isConstructionDivision(t.division)),
@@ -456,21 +452,18 @@ function renderAll(state) {
     t => t.estHrs,
     monthKeys
   );
-
   const ticketMaint = bucketSumByMonth(
     activeTickets.filter(t => isMaintenanceDivision(t.division) && !isConstructionDivision(t.division)),
     t => t.schedDate,
     t => t.estHrs,
     monthKeys
   );
-
   const pipeConstr = bucketSumByMonth(
     pipePotential.filter(p => isConstructionDivision(p.division)),
     p => p.startDate,
     p => p.weightedHours,
     monthKeys
   );
-
   const pipeMaint = bucketSumByMonth(
     pipePotential.filter(p => isMaintenanceDivision(p.division) && !isConstructionDivision(p.division)),
     p => p.startDate,
@@ -478,63 +471,52 @@ function renderAll(state) {
     monthKeys
   );
 
-  // Build chart arrays
   const constrTarget = monthKeys.map(m => state.targets.constrHours[m] || 0);
   const maintTarget  = monthKeys.map(m => state.targets.maintHours[m] || 0);
-
   const constrTickets = monthKeys.map(m => ticketConstr[m] || 0);
   const maintTickets  = monthKeys.map(m => ticketMaint[m] || 0);
-
   const constrPipe = monthKeys.map(m => pipeConstr[m] || 0);
   const maintPipe  = monthKeys.map(m => pipeMaint[m] || 0);
 
   chartConstr = destroy(chartConstr);
   chartMaint = destroy(chartMaint);
+  chartConstr = buildHoursChart(document.getElementById("chartConstruction"), monthKeys, constrTarget, constrTickets, constrPipe);
+  chartMaint  = buildHoursChart(document.getElementById("chartMaintenance"), monthKeys, maintTarget, maintTickets, maintPipe);
 
-  chartConstr = buildHoursChart(
-    document.getElementById("chartConstruction"),
-    monthKeys,
-    constrTarget,
-    constrTickets,
-    constrPipe
-  );
-
-  chartMaint = buildHoursChart(
-    document.getElementById("chartMaintenance"),
-    monthKeys,
-    maintTarget,
-    maintTickets,
-    maintPipe
-  );
-
-  // Year revenue KPI (view-specific)
+  // --- Year revenue KPI (view-specific) ---
   const inScopePipe = state.pipeline.filter(scope.pipeFilter);
   const pipeYearUnweighted = inScopePipe.reduce((acc, p) => acc + (p.estimatedDollars || 0), 0);
   const pipeYearWeighted = inScopePipe.reduce((acc, p) => acc + (p.weightedPipeline || 0), 0);
   const targetYearRev = scope.targetYearRev(state.targets);
 
   chartRevenueYear = destroy(chartRevenueYear);
-  chartRevenueYear = buildRevenueYearChart(
-    document.getElementById("chartRevenueYear"),
-    targetYearRev,
-    pipeYearUnweighted,
-    pipeYearWeighted
-  );
+  chartRevenueYear = buildRevenueYearChart(document.getElementById("chartRevenueYear"), targetYearRev, pipeYearUnweighted, pipeYearWeighted);
 
-  // Month tracking (target vs actual)
-  const actualsStore = loadActualsStore();
-  const a = getActualsForMonth(actualsStore, mk);
-
-  const tMonthRev = scope.targetMonthRev(state.targets, mk);
-  const tMonthHrs = scope.targetMonthHrs(state.targets, mk);
-  const aMonthRev = scope.actualMonthRev(a);
-  const aMonthHrs = scope.actualMonthHrs(a);
-
+  // --- Month tracking (target vs actual MTD) ---
   chartMonthTracking = destroy(chartMonthTracking);
   chartMonthTracking = buildMonthTrackingChart(
     document.getElementById("chartMonthTracking"),
-    [tMonthRev, tMonthHrs],
-    [aMonthRev, aMonthHrs]
+    [targetMonthRev, targetMonthHrs],
+    [actualMtdRev, actualMtdHrs]
+  );
+
+  // --- Revenue Pace chart ---
+  chartRevenuePace = destroy(chartRevenuePace);
+  chartRevenuePace = buildRevenuePaceChart(
+    document.getElementById("chartRevenuePace"),
+    targetMonthRev,
+    actualMtdRev,
+    projectedRev
+  );
+
+  // --- Month progress chart (target vs actual-to-date) ---
+  chartMonthProgress = destroy(chartMonthProgress);
+  chartMonthProgress = buildMonthProgressChart(
+    document.getElementById("chartMonthProgress"),
+    targetMonthRev,
+    actualMtdRev,
+    targetMonthHrs,
+    actualMtdHrs
   );
 
   document.getElementById("lastRefresh").textContent = new Date().toLocaleString();
@@ -592,25 +574,30 @@ async function loadAllData(state) {
     wPill.style.background = "rgba(239,68,68,0.15)";
   }
 
-  loadMonthActualsIntoInputs(loadActualsStore(), document.getElementById("asOfMonth").value);
+  const mk = document.getElementById("asOfMonth").value || state.targets.monthKeys[state.targets.monthKeys.length - 1];
+  loadMonthActualsIntoInputs(loadActualsStore(), mk);
 }
 
 function wireControls(state) {
-  document.getElementById("refreshBtn").onclick = async () => {
+  // IMPORTANT: Use addEventListener to avoid accidental overwrite in GitHub edits
+  document.getElementById("refreshBtn").addEventListener("click", async () => {
     await loadAllData(state);
     renderAll(state);
-  };
+  });
 
-  document.getElementById("viewToggle").onchange = () => renderAll(state);
-
-  document.getElementById("asOfMonth").onchange = () => {
-    loadMonthActualsIntoInputs(loadActualsStore(), document.getElementById("asOfMonth").value);
+  document.getElementById("viewToggle").addEventListener("change", () => {
     renderAll(state);
-  };
+  });
+
+  document.getElementById("asOfMonth").addEventListener("change", () => {
+    const mk = document.getElementById("asOfMonth").value;
+    loadMonthActualsIntoInputs(loadActualsStore(), mk);
+    renderAll(state);
+  });
 }
 
 function wireActualsButtons(state) {
-  document.getElementById("saveActualsBtn").onclick = () => {
+  document.getElementById("saveActualsBtn").addEventListener("click", () => {
     const mk = document.getElementById("asOfMonth").value;
     const store = loadActualsStore();
 
@@ -624,9 +611,9 @@ function wireActualsButtons(state) {
     saveActualsStore(store);
     loadMonthActualsIntoInputs(store, mk);
     renderAll(state);
-  };
+  });
 
-  document.getElementById("exportActualsBtn").onclick = () => {
+  document.getElementById("exportActualsBtn").addEventListener("click", () => {
     const store = loadActualsStore();
     const blob = new Blob([JSON.stringify(store, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -635,9 +622,9 @@ function wireActualsButtons(state) {
     a.download = "actuals.json";
     a.click();
     URL.revokeObjectURL(url);
-  };
+  });
 
-  document.getElementById("importActualsInput").onchange = async (ev) => {
+  document.getElementById("importActualsInput").addEventListener("change", async (ev) => {
     const file = ev.target.files?.[0];
     if (!file) return;
     try {
@@ -650,14 +637,14 @@ function wireActualsButtons(state) {
     } finally {
       ev.target.value = "";
     }
-  };
+  });
 
-  document.getElementById("clearActualsBtn").onclick = () => {
+  document.getElementById("clearActualsBtn").addEventListener("click", () => {
     if (!confirm("Clear ALL actuals stored in this browser?")) return;
     localStorage.removeItem(ACTUALS_KEY);
     loadMonthActualsIntoInputs(loadActualsStore(), document.getElementById("asOfMonth").value);
     renderAll(state);
-  };
+  });
 }
 
 // ----------------------------
@@ -672,4 +659,3 @@ function wireActualsButtons(state) {
   await loadAllData(state);
   renderAll(state);
 })();
-
