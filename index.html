@@ -1,172 +1,160 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sales & Ops Dashboard</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <header class="header">
-    <div>
-      <h1>Sales & Ops Dashboard</h1>
-      <div class="sub">
-        Data from <code>/data</code> folder • Last refresh: <span id="lastRefresh">—</span>
-      </div>
-    </div>
+:root {
+  --bg: #0b0f14;
+  --panel: #111827;
+  --card: #0f172a;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --border: rgba(255,255,255,0.10);
+  --pill: rgba(255,255,255,0.10);
+  --btn: #2563eb;
+  --btn2: rgba(255,255,255,0.10);
+  --danger: #dc2626;
+}
 
-    <div class="controls">
-      <label class="control">
-        <span>View</span>
-        <select id="viewToggle">
-          <option value="all">All</option>
-          <option value="construction">Construction</option>
-          <option value="maintenance">Maintenance</option>
-        </select>
-      </label>
+* { box-sizing: border-box; }
 
-      <label class="control">
-        <span>Month</span>
-        <select id="asOfMonth"></select>
-      </label>
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background: var(--bg);
+  color: var(--text);
+}
 
-      <button id="refreshBtn" class="btn">Refresh</button>
-    </div>
-  </header>
+.header {
+  padding: 18px 18px 8px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 
-  <section class="panel">
-    <h2>Data Status</h2>
-    <div class="grid3">
-      <div class="card">
-        <div class="cardTitle">Targets</div>
-        <div class="cardBody">
-          <div class="row">
-            <code id="targetsPath">—</code>
-            <span id="targetsStatus" class="pill">—</span>
-          </div>
-        </div>
-      </div>
+h1 { margin: 0; font-size: 20px; }
+h2 { margin: 0 0 12px 0; font-size: 16px; }
+h3 { margin: 0 0 10px 0; font-size: 14px; color: #d1d5db; }
 
-      <div class="card">
-        <div class="cardTitle">Pipeline</div>
-        <div class="cardBody">
-          <div class="row">
-            <code id="pipelinePath">—</code>
-            <span id="pipelineStatus" class="pill">—</span>
-          </div>
-        </div>
-      </div>
+.sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.muted { color: var(--muted); }
+.tiny { font-size: 12px; }
+.hint { margin-top: 8px; font-size: 12px; color: var(--muted); }
 
-      <div class="card">
-        <div class="cardTitle">Work Tickets</div>
-        <div class="cardBody">
-          <div class="row">
-            <code id="ticketsPath">—</code>
-            <span id="ticketsStatus" class="pill">—</span>
-          </div>
-        </div>
-      </div>
-    </div>
+.panel {
+  margin: 12px 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 14px;
+}
 
-    <div class="hint">
-      Weekly update: replace files in the GitHub repo <code>data/</code> folder and commit.
-    </div>
-  </section>
+.bottomPanel { margin-bottom: 24px; }
 
-  <section class="panel">
-    <h2>KPI Charts</h2>
+.sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
 
-    <div class="charts">
-      <div class="chartCard">
-        <h3>Revenue Target vs Pipeline (Year)</h3>
-        <canvas id="chartRevenueYear"></canvas>
-        <div class="hint">
-          Pipeline $ Unweighted = <b>Estimated $</b>. Weighted = <b>Weighted Pipeline</b>.
-        </div>
-      </div>
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
 
-      <div class="chartCard">
-        <h3>Tracking This Month (Target vs Actual)</h3>
-        <canvas id="chartMonthTracking"></canvas>
-        <div class="hint">
-          Enter actuals below (stored in your browser).
-        </div>
-      </div>
-    </div>
-  </section>
+.control { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+.control input, .control select {
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: 10px;
+  outline: none;
+}
 
-  <section class="panel">
-    <h2>Actuals Input (stored in this browser)</h2>
-    <div class="hint">
-      Save actuals for the selected month. Use Export/Import if you want to move actuals to another device.
-    </div>
+.btn {
+  border: 1px solid var(--border);
+  background: var(--btn);
+  color: white;
+  padding: 9px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn.secondary { background: var(--btn2); color: var(--text); }
+.btn.danger { background: var(--danger); }
+.fileBtn { display: inline-flex; align-items:center; justify-content:center; gap: 8px; }
 
-    <div class="actuals">
-      <div class="actualsCol">
-        <h3>Construction</h3>
-        <label class="control">
-          <span>Actual Revenue</span>
-          <input id="actConstrRev" type="number" step="0.01" placeholder="e.g., 125000" />
-        </label>
-        <label class="control">
-          <span>Actual Hours</span>
-          <input id="actConstrHrs" type="number" step="0.01" placeholder="e.g., 820" />
-        </label>
-      </div>
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1000px) {
+  .grid3 { grid-template-columns: 1fr; }
+}
 
-      <div class="actualsCol">
-        <h3>Maintenance</h3>
-        <label class="control">
-          <span>Actual Revenue</span>
-          <input id="actMaintRev" type="number" step="0.01" placeholder="e.g., 98000" />
-        </label>
-        <label class="control">
-          <span>Actual Hours</span>
-          <input id="actMaintHrs" type="number" step="0.01" placeholder="e.g., 4100" />
-        </label>
-      </div>
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+}
+.cardTitle { font-weight: 800; font-size: 13px; margin-bottom: 8px; }
+.cardBody { font-size: 13px; color: var(--muted); }
+.row { display:flex; align-items:center; justify-content: space-between; gap:10px; margin-bottom: 8px; }
 
-      <div class="actualsActions">
-        <button id="saveActualsBtn" class="btn">Save Actuals for Month</button>
-        <button id="exportActualsBtn" class="btn secondary">Export Actuals JSON</button>
-        <label class="btn secondary fileBtn">
-          Import Actuals JSON
-          <input id="importActualsInput" type="file" accept=".json" hidden />
-        </label>
-        <button id="clearActualsBtn" class="btn danger">Clear All Actuals</button>
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--pill);
+  color: var(--text);
+  font-size: 12px;
+}
 
-        <div class="tiny muted">
-          Current month actuals loaded: <span id="actualsLoaded">—</span>
-        </div>
-      </div>
-    </div>
-  </section>
+.actuals {
+  display: grid;
+  grid-template-columns: 1fr 1fr minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+@media (max-width: 1000px) {
+  .actuals { grid-template-columns: 1fr; }
+}
+.actualsCol, .actualsActions {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+}
+.actualsActions {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
 
-  <section class="panel">
-    <h2>Hours by Month</h2>
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+@media (max-width: 1000px) {
+  .charts { grid-template-columns: 1fr; }
+}
+.chartCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+}
 
-    <div class="charts">
-      <div class="chartCard">
-        <h3>Construction Hours</h3>
-        <canvas id="chartConstruction"></canvas>
-      </div>
+/* Prevent Chart.js resize/reflow loops */
+.chartCard canvas{
+  width: 100% !important;
+  height: 300px !important;
+  display: block;
+}
 
-      <div class="chartCard">
-        <h3>Maintenance Hours</h3>
-        <canvas id="chartMaintenance"></canvas>
-      </div>
-    </div>
-
-    <div class="hint">
-      Target is a <b>line</b>. Bars are <b>stacked</b>: Work Tickets (Open/Scheduled) + Opportunities (Pipeline Weighted Hours, excludes Won).
-    </div>
-  </section>
-
-  <!-- Libraries (must be BEFORE app.js) -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-  <script src="./app.js"></script>
-</body>
-</html>
+code { color: #c7d2fe; }
