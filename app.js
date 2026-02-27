@@ -346,18 +346,58 @@ function buildHoursChart(canvas, labels, targetLine, barsTickets, barsPipeline) 
   });
 }
 
-function buildRevenueYearChart(canvas, target, pipeUnweighted, pipeWeighted) {
+function buildRevenueYearChart(canvas, target, pipeUnwWon, pipeUnwRem, pipeWWon, pipeWRem) {
   return new Chart(canvas.getContext("2d"), {
     type: "bar",
     data: {
       labels: ["Year"],
       datasets: [
-        { label: "Target Revenue", data: [target] },
-        { label: "Pipeline $ (Unweighted)", data: [pipeUnweighted] },
-        { label: "Pipeline $ (Weighted)", data: [pipeWeighted] },
+        {
+          label: "Target Revenue",
+          data: [target],
+          backgroundColor: "rgba(54, 162, 235, 0.6)", // blue
+        },
+
+        // Unweighted bar (stack group: "unw")
+        {
+          label: "Pipeline $ (Unweighted) - Won",
+          data: [pipeUnwWon],
+          stack: "unw",
+          backgroundColor: "rgba(34, 197, 94, 0.75)", // green
+        },
+        {
+          label: "Pipeline $ (Unweighted) - Remaining",
+          data: [pipeUnwRem],
+          stack: "unw",
+          backgroundColor: "rgba(34, 197, 94, 0.25)", // light green
+        },
+
+        // Weighted bar (stack group: "w")
+        {
+          label: "Pipeline $ (Weighted) - Won",
+          data: [pipeWWon],
+          stack: "w",
+          backgroundColor: "rgba(168, 85, 247, 0.75)", // purple
+        },
+        {
+          label: "Pipeline $ (Weighted) - Remaining",
+          data: [pipeWRem],
+          stack: "w",
+          backgroundColor: "rgba(168, 85, 247, 0.25)", // light purple
+        },
       ],
     },
-    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { position: "top" } },
+      scales: {
+        // ✅ key: y.stacked MUST be true for stacked bars to render as stacked
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true },
+      },
+    },
   });
 }
 
@@ -748,5 +788,6 @@ function wireActualsButtons(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
