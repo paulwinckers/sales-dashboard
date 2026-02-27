@@ -101,6 +101,13 @@ function monthKeyFromTargetsLabel(label) {
 
   return null;
 }
+
+function addMonths(mk, delta) {
+  const [y, m] = mk.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 async function fetchText(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Fetch failed ${res.status} for ${url}`);
@@ -190,7 +197,6 @@ async function loadWorkTickets(url) {
     return found || null;
   };
 
-  // Your headers: Status, Sched Date, Est Hrs, Division
   const COL_STATUS = pick("status", "abr status", "ticket status", "work status");
   const COL_DATE   = pick("sched date", "scheduled date", "schedule date", "start date", "due date", "date");
   const COL_HRS    = pick("est hrs", "estimated hours", "hours", "labor hours");
@@ -207,7 +213,7 @@ async function loadWorkTickets(url) {
 // ----------------------------
 // Actuals (localStorage)
 // ----------------------------
-const ACTUALS_KEY = "dashboard_actuals_v3";
+const ACTUALS_KEY = "dashboard_actuals_v4";
 
 function loadActualsStore() {
   try {
@@ -249,9 +255,9 @@ function loadMonthActualsIntoInputs(store, mk) {
 let chartConstr = null;
 let chartMaint = null;
 let chartRevenueYear = null;
-let chartMonthTracking = null;
 let chartRevenuePace = null;
-let chartMonthProgress = null;
+let chartCoverageConstr = null;
+let chartCoverageMaint = null;
 
 function destroy(chart) { if (chart) chart.destroy(); return null; }
 
@@ -268,6 +274,7 @@ function bucketSumByMonth(items, getDate, getValue, monthKeys) {
   }
   return out;
 }
+
 function sumMonths(seriesByMonth, monthKeys) {
   return monthKeys.reduce((acc, k) => acc + (seriesByMonth[k] || 0), 0);
 }
@@ -307,20 +314,6 @@ function buildRevenueYearChart(canvas, target, pipeUnweighted, pipeWeighted) {
   });
 }
 
-function buildMonthTrackingChart(canvas, targetVals, actualVals) {
-  return new Chart(canvas.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: ["Revenue (MTD)", "Hours (MTD)"],
-      datasets: [
-        { label: "Target (Full Month)", data: targetVals },
-        { label: "Actual (MTD)", data: actualVals },
-      ],
-    },
-    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
-  });
-}
-
 function buildRevenuePaceChart(canvas, targetMonthRev, actualMtdRev, projectedFullMonthRev) {
   return new Chart(canvas.getContext("2d"), {
     type: "bar",
@@ -336,22 +329,51 @@ function buildRevenuePaceChart(canvas, targetMonthRev, actualMtdRev, projectedFu
   });
 }
 
-function buildMonthProgressChart(canvas, targetMonthRev, actualMtdRev, targetMonthHrs, actualMtdHrs) {
+// Color thresholds vs target:
+// red: < 0.75, yellow: < 0.90, green: >= 0.90
+function coverageColor(work, target) {
+  if (!target || target <= 0) return "rgba(156,163,175,0.7)"; // muted if no target
+  const r = work / target;
+  if (r < 0.75) return "rgba(239,68,68,0.75)";   // red
+  if (r < 0.90) return "rgba(234,179,8,0.75)";   // yellow
+  return "rgba(34,197,94,0.75)";                 // green
+}
+
+function buildCoverageChart(canvas, labels, targetLine, workBars) {
+  const colors = labels.map((_, i) => coverageColor(workBars[i], targetLine[i]));
+
   return new Chart(canvas.getContext("2d"), {
-    type: "bar",
     data: {
-      labels: ["Revenue", "Hours"],
+      labels,
       datasets: [
-        { label: "Target (Full Month)", data: [targetMonthRev, targetMonthHrs] },
-        { label: "Actual (MTD)", data: [actualMtdRev, actualMtdHrs] },
+        {
+          type: "line",
+          label: "Target Hours",
+          data: targetLine,
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: 0.2,
+        },
+        {
+          type: "bar",
+          label: "Work Tickets Hours (Open/Scheduled)",
+          data: workBars,
+          backgroundColor: colors,
+        }
       ],
     },
-    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { position: "top" } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
   });
 }
 
 // ----------------------------
-// Rendering
+// Rendering helpers
 // ----------------------------
 function populateMonthSelect(monthKeys) {
   const sel = document.getElementById("asOfMonth");
@@ -363,7 +385,6 @@ function populateMonthSelect(monthKeys) {
     opt.textContent = mk;
     sel.appendChild(opt);
   }
-  // keep selection if possible
   sel.value = monthKeys.includes(prior) ? prior : monthKeys[monthKeys.length - 1];
 }
 
@@ -372,9 +393,7 @@ function getScope(view) {
     return {
       targetYearRev: (t) => sumMonths(t.constrRev, t.monthKeys),
       targetMonthRev: (t, mk) => t.constrRev[mk] || 0,
-      targetMonthHrs: (t, mk) => t.constrHours[mk] || 0,
       actualMonthRev: (a) => a.constrRev || 0,
-      actualMonthHrs: (a) => a.constrHrs || 0,
       pipeFilter: (p) => isConstructionDivision(p.division),
     };
   }
@@ -382,9 +401,7 @@ function getScope(view) {
     return {
       targetYearRev: (t) => sumMonths(t.maintRev, t.monthKeys),
       targetMonthRev: (t, mk) => t.maintRev[mk] || 0,
-      targetMonthHrs: (t, mk) => t.maintHours[mk] || 0,
       actualMonthRev: (a) => a.maintRev || 0,
-      actualMonthHrs: (a) => a.maintHrs || 0,
       pipeFilter: (p) => isMaintenanceDivision(p.division) && !isConstructionDivision(p.division),
     };
   }
@@ -395,16 +412,12 @@ function getScope(view) {
       return s;
     },
     targetMonthRev: (t, mk) => (t.constrRev[mk] || 0) + (t.maintRev[mk] || 0),
-    targetMonthHrs: (t, mk) => (t.constrHours[mk] || 0) + (t.maintHours[mk] || 0),
     actualMonthRev: (a) => (a.constrRev || 0) + (a.maintRev || 0),
-    actualMonthHrs: (a) => (a.constrHrs || 0) + (a.maintHrs || 0),
     pipeFilter: (p) => isConstructionDivision(p.division) || isMaintenanceDivision(p.division),
   };
 }
 
 function projectionForMonth(mk, actualMtd) {
-  // If selected month is the current month, project based on day-of-month.
-  // Otherwise (past/future), just return actualMtd (no projection).
   const now = new Date();
   const currentMk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   if (mk !== currentMk) return actualMtd;
@@ -416,35 +429,49 @@ function projectionForMonth(mk, actualMtd) {
   return (actualMtd / day) * daysInMonth;
 }
 
+// ----------------------------
+// Main render
+// ----------------------------
 function renderAll(state) {
-  // ensure selects exist
   if (!state.targets?.monthKeys?.length) return;
 
-  const viewSel = document.getElementById("viewToggle");
-  const monthSel = document.getElementById("asOfMonth");
-
-  const view = viewSel.value || "all";
-  const mk = monthSel.value || state.targets.monthKeys[state.targets.monthKeys.length - 1];
-
+  const view = document.getElementById("viewToggle").value || "all";
+  const mk = document.getElementById("asOfMonth").value || state.targets.monthKeys[state.targets.monthKeys.length - 1];
   const scope = getScope(view);
   const monthKeys = state.targets.monthKeys;
 
-  // --- Actuals (MTD) ---
+  // --- KPI: Year revenue vs pipeline (view-specific) ---
+  const inScopePipe = state.pipeline.filter(scope.pipeFilter);
+  const pipeYearUnweighted = inScopePipe.reduce((acc, p) => acc + (p.estimatedDollars || 0), 0);
+  const pipeYearWeighted = inScopePipe.reduce((acc, p) => acc + (p.weightedPipeline || 0), 0);
+  const targetYearRev = scope.targetYearRev(state.targets);
+
+  chartRevenueYear = destroy(chartRevenueYear);
+  chartRevenueYear = buildRevenueYearChart(
+    document.getElementById("chartRevenueYear"),
+    targetYearRev,
+    pipeYearUnweighted,
+    pipeYearWeighted
+  );
+
+  // --- KPI: Revenue pace this month (view-specific) ---
   const actualsStore = loadActualsStore();
   const a = getActualsForMonth(actualsStore, mk);
-  const actualMtdRev = scope.actualMonthRev(a);
-  const actualMtdHrs = scope.actualMonthHrs(a);
-
-  // --- Targets (Full Month) ---
   const targetMonthRev = scope.targetMonthRev(state.targets, mk);
-  const targetMonthHrs = scope.targetMonthHrs(state.targets, mk);
-
-  // --- Revenue Pace projection ---
+  const actualMtdRev = scope.actualMonthRev(a);
   const projectedRev = projectionForMonth(mk, actualMtdRev);
 
-  // --- Hours by month (Construction + Maintenance always shown) ---
+  chartRevenuePace = destroy(chartRevenuePace);
+  chartRevenuePace = buildRevenuePaceChart(
+    document.getElementById("chartRevenuePace"),
+    targetMonthRev,
+    actualMtdRev,
+    projectedRev
+  );
+
+  // --- Hours by Month (Construction + Maintenance always) ---
   const activeTickets = state.tickets.filter(t => isTicketActive(t.status));
-  const pipePotential = state.pipeline.filter(p => !isWonPipelineStatus(p.status));
+  const pipePotential = state.pipeline.filter(p => !isWonPipelineStatus(p.status)); // exclude won for hours chart
 
   const ticketConstr = bucketSumByMonth(
     activeTickets.filter(t => isConstructionDivision(t.division)),
@@ -473,50 +500,57 @@ function renderAll(state) {
 
   const constrTarget = monthKeys.map(m => state.targets.constrHours[m] || 0);
   const maintTarget  = monthKeys.map(m => state.targets.maintHours[m] || 0);
+
   const constrTickets = monthKeys.map(m => ticketConstr[m] || 0);
   const maintTickets  = monthKeys.map(m => ticketMaint[m] || 0);
+
   const constrPipe = monthKeys.map(m => pipeConstr[m] || 0);
   const maintPipe  = monthKeys.map(m => pipeMaint[m] || 0);
 
   chartConstr = destroy(chartConstr);
   chartMaint = destroy(chartMaint);
-  chartConstr = buildHoursChart(document.getElementById("chartConstruction"), monthKeys, constrTarget, constrTickets, constrPipe);
-  chartMaint  = buildHoursChart(document.getElementById("chartMaintenance"), monthKeys, maintTarget, maintTickets, maintPipe);
 
-  // --- Year revenue KPI (view-specific) ---
-  const inScopePipe = state.pipeline.filter(scope.pipeFilter);
-  const pipeYearUnweighted = inScopePipe.reduce((acc, p) => acc + (p.estimatedDollars || 0), 0);
-  const pipeYearWeighted = inScopePipe.reduce((acc, p) => acc + (p.weightedPipeline || 0), 0);
-  const targetYearRev = scope.targetYearRev(state.targets);
-
-  chartRevenueYear = destroy(chartRevenueYear);
-  chartRevenueYear = buildRevenueYearChart(document.getElementById("chartRevenueYear"), targetYearRev, pipeYearUnweighted, pipeYearWeighted);
-
-  // --- Month tracking (target vs actual MTD) ---
-  chartMonthTracking = destroy(chartMonthTracking);
-  chartMonthTracking = buildMonthTrackingChart(
-    document.getElementById("chartMonthTracking"),
-    [targetMonthRev, targetMonthHrs],
-    [actualMtdRev, actualMtdHrs]
+  chartConstr = buildHoursChart(
+    document.getElementById("chartConstruction"),
+    monthKeys,
+    constrTarget,
+    constrTickets,
+    constrPipe
   );
 
-  // --- Revenue Pace chart ---
-  chartRevenuePace = destroy(chartRevenuePace);
-  chartRevenuePace = buildRevenuePaceChart(
-    document.getElementById("chartRevenuePace"),
-    targetMonthRev,
-    actualMtdRev,
-    projectedRev
+  chartMaint = buildHoursChart(
+    document.getElementById("chartMaintenance"),
+    monthKeys,
+    maintTarget,
+    maintTickets,
+    maintPipe
   );
 
-  // --- Month progress chart (target vs actual-to-date) ---
-  chartMonthProgress = destroy(chartMonthProgress);
-  chartMonthProgress = buildMonthProgressChart(
-    document.getElementById("chartMonthProgress"),
-    targetMonthRev,
-    actualMtdRev,
-    targetMonthHrs,
-    actualMtdHrs
+  // --- Next 3 months coverage (Target vs Work Tickets only) ---
+  const startIdx = Math.max(0, monthKeys.indexOf(mk));
+  const next3 = monthKeys.slice(startIdx, startIdx + 3);
+
+  const next3ConstrTarget = next3.map(m => state.targets.constrHours[m] || 0);
+  const next3MaintTarget  = next3.map(m => state.targets.maintHours[m] || 0);
+
+  const next3ConstrWork = next3.map(m => ticketConstr[m] || 0);
+  const next3MaintWork  = next3.map(m => ticketMaint[m] || 0);
+
+  chartCoverageConstr = destroy(chartCoverageConstr);
+  chartCoverageMaint = destroy(chartCoverageMaint);
+
+  chartCoverageConstr = buildCoverageChart(
+    document.getElementById("chartCoverageConstr"),
+    next3,
+    next3ConstrTarget,
+    next3ConstrWork
+  );
+
+  chartCoverageMaint = buildCoverageChart(
+    document.getElementById("chartCoverageMaint"),
+    next3,
+    next3MaintTarget,
+    next3MaintWork
   );
 
   document.getElementById("lastRefresh").textContent = new Date().toLocaleString();
@@ -534,7 +568,6 @@ async function loadAllData(state) {
   const pPill = document.getElementById("pipelineStatus");
   const wPill = document.getElementById("ticketsStatus");
 
-  // Targets
   tPath.textContent = DEFAULT_FILES.targetsCsv;
   try {
     state.targets = await loadTargets(DEFAULT_FILES.targetsCsv);
@@ -548,7 +581,6 @@ async function loadAllData(state) {
     throw e;
   }
 
-  // Pipeline
   pPath.textContent = DEFAULT_FILES.pipelineCsv;
   try {
     state.pipeline = await loadPipeline(DEFAULT_FILES.pipelineCsv);
@@ -561,7 +593,6 @@ async function loadAllData(state) {
     pPill.style.background = "rgba(239,68,68,0.15)";
   }
 
-  // Work Tickets
   wPath.textContent = DEFAULT_FILES.workTicketsXlsx;
   try {
     state.tickets = await loadWorkTickets(DEFAULT_FILES.workTicketsXlsx);
@@ -579,7 +610,6 @@ async function loadAllData(state) {
 }
 
 function wireControls(state) {
-  // IMPORTANT: Use addEventListener to avoid accidental overwrite in GitHub edits
   document.getElementById("refreshBtn").addEventListener("click", async () => {
     await loadAllData(state);
     renderAll(state);
@@ -652,7 +682,6 @@ function wireActualsButtons(state) {
 // ----------------------------
 (async function init() {
   const state = { targets: null, pipeline: [], tickets: [] };
-
   wireControls(state);
   wireActualsButtons(state);
 
