@@ -54,21 +54,25 @@
         </div>
       </div>
     </div>
+  </section>
+
+  <section class="panel">
+    <h2>Next 3 Months Coverage</h2>
 
     <div class="charts">
       <div class="chartCard">
-        <h3>Full Month Target vs Actual-to-Date</h3>
-        <canvas id="chartMonthProgress"></canvas>
+        <h3>Construction (Target vs Work Tickets)</h3>
+        <canvas id="chartCoverageConstr"></canvas>
         <div class="hint">
-          Simple comparison of monthly target vs your actual-to-date entry (Revenue & Hours).
+          Bar color: <b>Red</b> &lt;75% • <b>Yellow</b> 75–90% • <b>Green</b> ≥90% of target hours.
         </div>
       </div>
 
       <div class="chartCard">
-        <h3>Tracking This Month (Target vs Actual-to-Date)</h3>
-        <canvas id="chartMonthTracking"></canvas>
+        <h3>Maintenance (Target vs Work Tickets)</h3>
+        <canvas id="chartCoverageMaint"></canvas>
         <div class="hint">
-          This is view-specific (All / Construction / Maintenance).
+          Bar color: <b>Red</b> &lt;75% • <b>Yellow</b> 75–90% • <b>Green</b> ≥90% of target hours.
         </div>
       </div>
     </div>
@@ -177,7 +181,7 @@
     </div>
   </section>
 
-  <!-- Libraries (must be BEFORE app.js) -->
+  <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -185,4 +189,3 @@
   <script src="./app.js"></script>
 </body>
 </html>
-
