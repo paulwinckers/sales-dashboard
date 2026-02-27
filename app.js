@@ -487,17 +487,27 @@ function renderAll(state) {
   const monthKeys = state.targets.monthKeys;
 
   // --- KPI charts ---
-  const inScopePipe = state.pipeline.filter(scope.pipeFilter);
-  const pipeYearUnweighted = inScopePipe.reduce((acc, p) => acc + (p.estimatedDollars || 0), 0);
-  const pipeYearWeighted = inScopePipe.reduce((acc, p) => acc + (p.weightedPipeline || 0), 0);
-  const targetYearRev = scope.targetYearRev(state.targets);
+ const inScopePipe = state.pipeline.filter(scope.pipeFilter);
 
-  chartRevenueYear = destroy(chartRevenueYear);
-  chartRevenueYear = buildRevenueYearChart(
-    document.getElementById("chartRevenueYear"),
-    targetYearRev,
-    pipeYearUnweighted,
-    pipeYearWeighted
+const wonPipe = inScopePipe.filter(p => isWonPipelineStatus(p.status));
+const remPipe = inScopePipe.filter(p => !isWonPipelineStatus(p.status));
+
+const pipeUnwWon = wonPipe.reduce((acc, p) => acc + (p.estimatedDollars || 0), 0);
+const pipeUnwRem = remPipe.reduce((acc, p) => acc + (p.estimatedDollars || 0), 0);
+
+const pipeWWon = wonPipe.reduce((acc, p) => acc + (p.weightedPipeline || 0), 0);
+const pipeWRem = remPipe.reduce((acc, p) => acc + (p.weightedPipeline || 0), 0);
+
+const targetYearRev = scope.targetYearRev(state.targets);
+
+chartRevenueYear = destroy(chartRevenueYear);
+chartRevenueYear = buildRevenueYearChart(
+  document.getElementById("chartRevenueYear"),
+  targetYearRev,
+  pipeUnwWon,
+  pipeUnwRem,
+  pipeWWon,
+  pipeWRem
   );
 
   const actualsStore = loadActualsStore();
@@ -738,4 +748,5 @@ function wireActualsButtons(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
