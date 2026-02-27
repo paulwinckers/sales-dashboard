@@ -347,12 +347,16 @@ function buildCoverageChart(canvas, labels, targetLine, workBars) {
       labels,
       datasets: [
         {
+          {
           type: "line",
           label: "Target Hours",
           data: targetLine,
           borderWidth: 2,
           pointRadius: 2,
           tension: 0.2,
+          borderColor: "rgba(54, 162, 235, 1)",       // blue
+          pointBackgroundColor: "rgba(54, 162, 235, 1)",
+},
         },
         {
           type: "bar",
@@ -491,11 +495,10 @@ function renderAll(state) {
     p => p.weightedHours,
     monthKeys
   );
-  const pipeMaint = bucketSumByMonth(
-    pipePotential.filter(p => isMaintenanceDivision(p.division) && !isConstructionDivision(p.division)),
-    p => p.startDate,
-    p => p.weightedHours,
-    monthKeys
+ const maintPipeRows = pipePotential.filter(
+  p => isMaintenanceDivision(p.division) && !isConstructionDivision(p.division)
+);
+const pipeMaint = bucketMaintenancePipelineSpread(maintPipeRows, monthKeys);
   );
 
   const constrTarget = monthKeys.map(m => state.targets.constrHours[m] || 0);
@@ -608,7 +611,37 @@ async function loadAllData(state) {
   const mk = document.getElementById("asOfMonth").value || state.targets.monthKeys[state.targets.monthKeys.length - 1];
   loadMonthActualsIntoInputs(loadActualsStore(), mk);
 }
+function bucketMaintenancePipelineSpread(pipelineRows, monthKeys) {
+  // Spreads each opportunity’s weightedHours evenly from its Start Date month through November (inclusive)
+  // Example: March → November = 9 months, so each month gets weightedHours / 9
+  const out = {};
+  for (const k of monthKeys) out[k] = 0;
 
+  for (const p of pipelineRows) {
+    if (!p.startDate) continue;
+
+    const y = p.startDate.getFullYear();
+    const startM = p.startDate.getMonth() + 1; // 1-12
+    const endM = 11; // November
+
+    if (startM > endM) {
+      // If start date is after Nov, just bucket into its start month (if present)
+      const mk = monthKeyFromDate(p.startDate);
+      if (mk in out) out[mk] += Number(p.weightedHours || 0);
+      continue;
+    }
+
+    const monthsCount = (endM - startM + 1);
+    const perMonth = Number(p.weightedHours || 0) / monthsCount;
+
+    for (let m = startM; m <= endM; m++) {
+      const mk = `${y}-${String(m).padStart(2, "0")}`;
+      if (mk in out) out[mk] += perMonth;
+    }
+  }
+
+  return out;
+}
 function wireControls(state) {
   document.getElementById("refreshBtn").addEventListener("click", async () => {
     await loadAllData(state);
@@ -688,3 +721,4 @@ function wireActualsButtons(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
