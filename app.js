@@ -427,6 +427,7 @@ function buildCoverageChart(canvas, labels, targetLine, workBars) {
 function populateMonthSelect(monthKeys) {
   const sel = document.getElementById("asOfMonth");
   const prior = sel.value;
+
   sel.innerHTML = "";
   for (const mk of monthKeys) {
     const opt = document.createElement("option");
@@ -434,7 +435,18 @@ function populateMonthSelect(monthKeys) {
     opt.textContent = mk;
     sel.appendChild(opt);
   }
-  sel.value = monthKeys.includes(prior) ? prior : monthKeys[monthKeys.length - 1];
+
+  // ✅ default to current month if present
+  const now = new Date();
+  const currentMk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  if (monthKeys.includes(currentMk)) {
+    sel.value = currentMk;
+  } else if (monthKeys.includes(prior)) {
+    sel.value = prior;
+  } else {
+    sel.value = monthKeys[monthKeys.length - 1];
+  }
 }
 
 function getScope(view) {
@@ -726,3 +738,4 @@ function wireActualsButtons(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
