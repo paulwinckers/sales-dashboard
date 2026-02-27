@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Ops Dashboard</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./app.js"></script>
+</head>
+
+<body>
+  <!-- Toggle Nav -->
+  <div class="dash-nav">
+    <a href="../">Sales</a>
+    <a class="active" href="./">Ops</a>
+  </div>
+
+  <div class="wrap">
+
+    <div class="header">
+      <div>
+        <h1>Daily Operations Scoreboard (Ops)</h1>
+        <div class="sub">
+          <span class="pill">Selected day: <strong id="displayDate">—</strong></span>
+          <span class="pill">Month: <strong id="monthLabel">—</strong></span>
+          <span class="pill">Target source: <strong id="targetSource">—</strong></span>
+          <span class="pill">Calendar: <strong id="calendarLabel">Loading…</strong></span>
+          <span class="pill">Targets: <strong id="targetsLabel">Loading…</strong></span>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn secondary" id="btnPrevDay">◀ Prev</button>
+        <input type="date" id="datePicker"/>
+        <button class="btn secondary" id="btnNextDay">Next ▶</button>
+        <button class="btn" id="btnToday">Today</button>
+        <button class="btn secondary" id="btnGoYesterday">Yesterday</button>
+        <button class="btn secondary" id="btnReloadData">Reload /data</button>
+        <button class="btn danger" id="btnClearDay">Clear day</button>
+      </div>
+    </div>
+
+    <div class="gridTop">
+      <!-- Production -->
+      <div class="card">
+        <div class="cardHeader">
+          <h2>Daily Production</h2>
+          <div class="hint">Green ≥100% • Yellow 95–99.9% • Red &lt;95% • 0 target = neutral</div>
+        </div>
+        <div class="cardBody">
+          <div id="prodStatus" class="statusBox">
+            <div class="kpiBig">
+              <div class="label">Daily target hours (Maintenance + Construction)</div>
+              <div class="value mono" id="dailyTarget">—</div>
+              <div class="meta">
+                <span>Maint/day: <strong class="mono" id="dailyTargetMaint">—</strong></span>
+                <span>Const/day: <strong class="mono" id="dailyTargetConst">—</strong></span>
+                <span>Actual total: <strong class="mono" id="actualTotal">—</strong></span>
+                <span>Delta: <strong class="mono" id="deltaPct">—</strong></span>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="formGrid">
+              <div>
+                <div class="label">Actual Maintenance hours</div>
+                <input type="number" step="0.25" min="0" id="actualMaint" placeholder="0" style="width:100%"/>
+              </div>
+              <div>
+                <div class="label">Actual Construction hours</div>
+                <input type="number" step="0.25" min="0" id="actualConst" placeholder="0" style="width:100%"/>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="controls" style="justify-content:space-between;">
+              <div class="hint">Test mode: saved locally on this device</div>
+              <button class="btn" id="btnSaveDay">Save day</button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Tickets -->
+      <div class="card">
+        <div class="cardHeader">
+          <h2>Work Tickets Missed</h2>
+          <div class="hint">Green 0 • Red 1+</div>
+        </div>
+        <div class="cardBody">
+          <div id="ticketsStatus" class="statusBox">
+            <div class="kpiBig">
+              <div class="label">Missed tickets (selected day)</div>
+              <div class="value mono" id="ticketsValue">—</div>
+            </div>
+            <div class="divider"></div>
+            <input type="number" step="1" min="0" id="ticketsInput" placeholder="0" style="width:100%"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Safety -->
+      <div class="card">
+        <div class="cardHeader">
+          <h2>Safety Incidents</h2>
+          <div class="hint">Green 0 • Red 1+</div>
+        </div>
+        <div class="cardBody">
+          <div id="safetyStatus" class="statusBox">
+            <div class="kpiBig">
+              <div class="label">Incidents (selected day)</div>
+              <div class="value mono" id="safetyValue">—</div>
+            </div>
+            <div class="divider"></div>
+            <input type="number" step="1" min="0" id="safetyInput" placeholder="0" style="width:100%"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gridMid">
+      <!-- MTD -->
+      <div class="card">
+        <div class="cardHeader">
+          <div>
+            <h2>Month-to-Date (MTD)</h2>
+            <div class="hint">Toggle drives headline + status</div>
+          </div>
+          <select id="kpiView">
+            <option value="total">View: Total</option>
+            <option value="maint">View: Maintenance</option>
+            <option value="const">View: Construction</option>
+          </select>
+        </div>
+        <div class="cardBody">
+          <div id="mtdStatus" class="statusBox">
+            <div class="kpiBig">
+              <div class="label">MTD actual vs target (through selected day)</div>
+              <div class="value mono" id="mtdHeadline">—</div>
+              <div class="meta">
+                <span>Target: <strong class="mono" id="mtdTarget">—</strong></span>
+                <span>Actual: <strong class="mono" id="mtdActual">—</strong></span>
+                <span>Var: <strong class="mono" id="mtdVar">—</strong></span>
+                <span>%: <strong class="mono" id="mtdPct">—</strong></span>
+              </div>
+              <div class="meta">
+                <span>Maint: <strong class="mono" id="mtdMaintLine">—</strong></span>
+                <span>Const: <strong class="mono" id="mtdConstLine">—</strong></span>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div class="bar"><div id="mtdBar"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- YTD -->
+      <div class="card">
+        <div class="cardHeader">
+          <div>
+            <h2>Year-to-Date (YTD)</h2>
+            <div class="hint">Same toggle applies</div>
+          </div>
+          <span class="pill">Calendar-driven preferred</span>
+        </div>
+        <div class="cardBody">
+          <div id="ytdStatus" class="statusBox">
+            <div class="kpiBig">
+              <div class="label">YTD actual vs target (Jan 1 → selected day)</div>
+              <div class="value mono" id="ytdHeadline">—</div>
+              <div class="meta">
+                <span>Target: <strong class="mono" id="ytdTarget">—</strong></span>
+                <span>Actual: <strong class="mono" id="ytdActual">—</strong></span>
+                <span>Var: <strong class="mono" id="ytdVar">—</strong></span>
+                <span>%: <strong class="mono" id="ytdPct">—</strong></span>
+              </div>
+              <div class="meta">
+                <span>Maint: <strong class="mono" id="ytdMaintLine">—</strong></span>
+                <span>Const: <strong class="mono" id="ytdConstLine">—</strong></span>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div class="bar"><div id="ytdBar"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gridBottom">
+      <!-- Monthly Summary -->
+      <div class="card">
+        <div class="cardHeader">
+          <div>
+            <h2>Monthly Summary (Selected Month)</h2>
+            <div class="hint">Actual vs Target by division + total</div>
+          </div>
+          <button class="btn secondary" id="btnJumpMonthStart">Month Start</button>
+        </div>
+        <div class="cardBody">
+          <div class="statusBox" id="monthSummaryBox">
+            <div class="meta">
+              <span class="tag" id="monthSummaryTag">—</span>
+              <span>Fallback month target: <strong class="mono" id="monthFallbackTarget">—</strong></span>
+            </div>
+            <div class="divider"></div>
+
+            <div class="tableWrap" style="max-height:260px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Division</th>
+                    <th class="mono">Target</th>
+                    <th class="mono">Actual</th>
+                    <th class="mono">Var</th>
+                    <th class="mono">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Maintenance</td>
+                    <td class="mono" id="msTMaint">—</td>
+                    <td class="mono" id="msAMaint">—</td>
+                    <td class="mono" id="msVMaint">—</td>
+                    <td class="mono" id="msPMaint">—</td>
+                  </tr>
+                  <tr>
+                    <td>Construction</td>
+                    <td class="mono" id="msTConst">—</td>
+                    <td class="mono" id="msAConst">—</td>
+                    <td class="mono" id="msVConst">—</td>
+                    <td class="mono" id="msPConst">—</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Total</strong></td>
+                    <td class="mono" id="msTTotal">—</td>
+                    <td class="mono" id="msATotal">—</td>
+                    <td class="mono" id="msVTotal">—</td>
+                    <td class="mono" id="msPTotal">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="divider"></div>
+            <div class="hint">
+              Targets use calendar sums if calendar is available; otherwise monthly-average fallback.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Daily Log -->
+      <div class="card">
+        <div class="cardHeader">
+          <div>
+            <h2>Daily Log (Selected Month)</h2>
+            <div class="hint">Click a row to jump to that date</div>
+          </div>
+          <button class="btn secondary" id="btnExportMonth">Export Month CSV</button>
+        </div>
+        <div class="cardBody">
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th class="mono">Target M</th>
+                  <th class="mono">Target C</th>
+                  <th class="mono">Target T</th>
+                  <th class="mono">Actual M</th>
+                  <th class="mono">Actual C</th>
+                  <th class="mono">Actual T</th>
+                  <th class="mono">Δ%</th>
+                  <th class="mono">Missed</th>
+                  <th class="mono">Safety</th>
+                </tr>
+              </thead>
+              <tbody id="monthTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data (auto-load + manual override) -->
+    <div style="margin-top:14px;">
+      <div class="card">
+        <div class="cardHeader">
+          <h2>Data Sources</h2>
+          <div class="hint">Auto-loads from repo /data; you can override via upload for testing</div>
+        </div>
+        <div class="cardBody">
+          <div class="controls" style="justify-content:space-between; align-items:flex-start;">
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <div class="controls">
+                <button class="btn secondary" id="btnLoadCalendar">Load ../data/calendar.csv</button>
+                <input type="file" id="calendarFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"/>
+                <button class="btn secondary" id="btnClearCalendar">Clear calendar</button>
+              </div>
+              <div class="hint">Calendar headers expected: <span class="mono">Date, MaintenanceHours, ConstructionHours</span></div>
+
+              <div class="controls">
+                <button class="btn secondary" id="btnLoadTargets">Load ../data/targets.csv</button>
+                <input type="file" id="targetsFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"/>
+                <button class="btn secondary" id="btnClearTargets">Clear targets</button>
+              </div>
+              <div class="hint">Targets headers expected: <span class="mono">Month, Construction Hours, Maintenance Hours</span> (fallback)</div>
+            </div>
+
+            <div class="meta">
+              <span>Month maint: <strong class="mono" id="monthTargetMaint">—</strong></span>
+              <span>Month const: <strong class="mono" id="monthTargetConst">—</strong></span>
+              <span>Month total: <strong class="mono" id="monthTargetTotal">—</strong></span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="controls" style="justify-content:space-between;">
+            <div class="hint">Local test data tools</div>
+            <div class="controls">
+              <button class="btn secondary" id="btnExportLocal">Export local JSON</button>
+              <button class="btn danger" id="btnResetAll">Reset ALL local data</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operations Issues -->
+    <div style="margin-top:14px;">
+      <div class="card">
+        <div class="cardHeader">
+          <div>
+            <h2>Operations Issues (Aspire Export)</h2>
+            <div class="hint">Import CSV export (recommended). XLSX parsing can be added later.</div>
+          </div>
+          <div class="controls">
+            <input type="file" id="issuesFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"/>
+            <button class="btn secondary" id="btnClearIssues">Clear issues</button>
+          </div>
+        </div>
+        <div class="cardBody">
+          <div class="hint" style="margin-bottom:10px;">
+            Expected columns: <span class="mono">Assigned To Contact, Date, Subject, Status, Priority, Notes</span>
+          </div>
+          <div class="tableWrap" style="max-height:420px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Assigned To</th>
+                  <th class="mono">Date</th>
+                  <th>Subject</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="issuesTbody">
+                <tr><td colspan="6" class="hint">No issues loaded.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+</body>
+</html>
