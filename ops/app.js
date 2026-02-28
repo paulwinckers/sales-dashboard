@@ -1,5 +1,5 @@
- const CONFIG = {
-  SHEET_API_URL: "https://script.google.com/macros/s/AKfycbxemOcHaO8jJL2JNvr6G3INrHOSahH3-1QYcsrb5IV19DG77lPUPtDkco_s9r8RFwmI/exec", // ends with /exec
+const CONFIG = {
+  SHEET_API_URL: "https://script.google.com/macros/s/AKfycbxemOcHaO8jJL2JNvr6G3INrHOSahH3-1QYcsrb5IV19DG77lPUPtDkco_s9r8RFwmI/exec", // /exec
   API_KEY: "",
   SHEET_TAB_NAME: "OpsDailyLog",
   CALENDAR_URL: "../data/calendar.csv",
@@ -8,6 +8,7 @@
 
 /* ---------------- helpers ---------------- */
 const el = (id) => document.getElementById(id);
+
 const safeNum = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -26,15 +27,16 @@ function ymd(d){
   const pad = (x)=> String(x).padStart(2,"0");
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
+
 function monthKeyFromDate(d){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
 }
-function monthStartEnd(selYmd){
+
+function monthStart(selYmd){
   const d=new Date(selYmd+"T00:00:00");
-  const start = ymd(new Date(d.getFullYear(), d.getMonth(), 1));
-  const end = ymd(new Date(d.getFullYear(), d.getMonth()+1, 0));
-  return { start, end };
+  return ymd(new Date(d.getFullYear(), d.getMonth(), 1));
 }
+
 function yearStart(selYmd){
   const d=new Date(selYmd+"T00:00:00");
   return `${d.getFullYear()}-01-01`;
@@ -48,12 +50,22 @@ function setBoxStatus(node, state){
   node.classList.remove("good","warn","bad");
   if(state) node.classList.add(state);
 }
+
 function statusByPct(pct){
   if(pct==null) return null;
   if(pct<0.95) return "bad";
   if(pct<1.0) return "warn";
   return "good";
 }
+
+function tagByPct(pct){
+  // prior rule: red if more than 5% short, yellow if within 5%, green if hit/exceed
+  if(pct==null) return { cls:"", txt:"No budget" };
+  if(pct < 0.95) return { cls:"bad", txt:"Off Target" };
+  if(pct < 1.0)  return { cls:"warn", txt:"Close" };
+  return { cls:"good", txt:"On Target" };
+}
+
 function escapeHtml(s){
   return String(s ?? "")
     .replaceAll("&","&amp;")
@@ -61,6 +73,15 @@ function escapeHtml(s){
     .replaceAll(">","&gt;")
     .replaceAll('"',"&quot;")
     .replaceAll("'","&#039;");
+}
+
+function hasValue(v){
+  return v !== null && v !== undefined && String(v).trim() !== "";
+}
+
+function isOffDay(dayType){
+  const dt = String(dayType || "").trim().toLowerCase();
+  return dt === "weekend" || dt === "stat";
 }
 
 /* ---------------- CSV parsing ---------------- */
@@ -98,20 +119,22 @@ function toMonthKey(raw){
 
   const monthMap={jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
 
-  let m=s.match(/^(\d{2})[-\s]?([A-Za-z]{3,})\.?$/); // 26-Jan
+  let m=s.match(/^(\d{2})[-\s]?([A-Za-z]{3,})\.?$/);  // 26-Jan
   if(m){
     const yy=String(m[1]).padStart(2,"0");
     const mon=m[2].slice(0,3).toLowerCase();
     const mm=monthMap[mon];
     if(mm) return `20${yy}-${mm}`;
   }
-  m=s.match(/^([A-Za-z]{3,})[-\s]?(\d{2})$/); // Jan-26
+
+  m=s.match(/^([A-Za-z]{3,})[-\s]?(\d{2})$/);        // Jan-26
   if(m){
     const mon=m[1].slice(0,3).toLowerCase();
     const yy=String(m[2]).padStart(2,"0");
     const mm=monthMap[mon];
     if(mm) return `20${yy}-${mm}`;
   }
+
   const m2=s.match(/^(\d{4})-(\d{2})$/);
   if(m2) return `${m2[1]}-${m2[2]}`;
 
@@ -208,22 +231,22 @@ function sumCalendarTargetsByDivision(startYmd, endYmd){
   return { maint, cons, total: maint + cons };
 }
 
-/* ---------------- daily log from Google Sheet ---------------- */
-let daily = {}; // daily[YYYY-MM-DD] = record
+/* ---------------- daily from Google Sheet ---------------- */
+let daily = {};
 let sheetLoadedCount = 0;
 
 function getDayRec(dateKey){
   return daily[dateKey] || {
-    date: dateKey, dayType:"",
-    targetMaint:"", targetConst:"",
-    actualMaint:"", actualConst:"",
-    missedTickets:"", safetyIncidents:"",
+    date: dateKey,
+    dayType:"",
+    targetMaint:"",
+    targetConst:"",
+    actualMaint:"",
+    actualConst:"",
+    missedTickets:"",
+    safetyIncidents:"",
     notes:""
   };
-}
-
-function hasValue(v){
-  return v !== null && v !== undefined && String(v).trim() !== "";
 }
 
 async function loadDailyFromGoogle(rangeStart, rangeEnd){
@@ -243,6 +266,7 @@ async function loadDailyFromGoogle(rangeStart, rangeEnd){
 
   const map = {};
   const rows = Array.isArray(data.rows) ? data.rows : [];
+
   for(const r of rows){
     const date = String(r.Date || "").slice(0,10);
     if(!date.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
@@ -264,15 +288,13 @@ async function loadDailyFromGoogle(rangeStart, rangeEnd){
   sheetLoadedCount = rows.length;
 }
 
-/* ---------------- budget/target logic ----------------
-   Priority: Sheet daily targets (including 0 if explicitly set) → calendar → targets.csv fallback (monthly avg, weekday-only)
-*/
+/* ---------------- budget logic ---------------- */
 function computeFallbackDailyTargets(dateKey){
   const d = new Date(dateKey+"T00:00:00");
   const mk = monthKeyFromDate(d);
   const t = targets[mk] || { maintenanceMonthly:0, constructionMonthly:0 };
 
-  // weekday-only fallback count (simple). You now have daily targets in sheet, so fallback is rarely used.
+  // weekday-only fallback (rarely used since sheet has daily targets)
   const year = d.getFullYear();
   const month = d.getMonth();
   let wd = 0;
@@ -291,7 +313,7 @@ function computeFallbackDailyTargets(dateKey){
 function getDayBudget(dateKey){
   const rec = getDayRec(dateKey);
 
-  // If sheet has explicit values (including 0), use them
+  // Sheet daily targets (explicit, including 0)
   const sheetHasMaint = hasValue(rec.targetMaint);
   const sheetHasConst = hasValue(rec.targetConst);
   if(sheetHasMaint || sheetHasConst){
@@ -300,18 +322,18 @@ function getDayBudget(dateKey){
     return { maint:m, cons:c, total:m+c, source:"Sheet" };
   }
 
-  // Else calendar
+  // Calendar fallback
   if(calendarLoaded){
     const c = getCalendarTargetForDate(dateKey);
     if(c.has) return { maint:c.maint, cons:c.cons, total:c.total, source:"Calendar" };
   }
 
-  // Else fallback
+  // targets.csv avg fallback
   return computeFallbackDailyTargets(dateKey);
 }
 
 function sumBudgetForRange(startYmd, endYmd){
-  // Prefer summing sheet daily targets if ANY day in range has explicit target values
+  // Prefer summing sheet targets if any exist
   let anySheet = false;
   let sm=0, sc=0;
 
@@ -328,19 +350,17 @@ function sumBudgetForRange(startYmd, endYmd){
   }
   if(anySheet) return { maint:sm, cons:sc, total:sm+sc, source:"Sheet" };
 
-  // Else calendar sum
   if(calendarLoaded){
     const c = sumCalendarTargetsByDivision(startYmd, endYmd);
     return { ...c, source:"Calendar" };
   }
 
-  // Else fallback: sum per-day averages across weekdays
+  // fallback: weekday averages
   let maint=0, cons=0;
   for(let d=new Date(startYmd+"T00:00:00"); d<=new Date(endYmd+"T00:00:00"); d.setDate(d.getDate()+1)){
     const day = d.getDay();
     if(day===0 || day===6) continue;
-    const k = ymd(d);
-    const fb = computeFallbackDailyTargets(k);
+    const fb = computeFallbackDailyTargets(ymd(d));
     maint += fb.maint;
     cons  += fb.cons;
   }
@@ -357,18 +377,29 @@ function sumActualsForRange(startYmd, endYmd){
   return { maint, cons, total: maint+cons };
 }
 
-/* ---------------- render: 2-week table ---------------- */
-function renderTwoWeekTable(asOfYmd){
-  const tbody = el("twoWeekTbody");
+/* ---------------- render log (workdays by default) ---------------- */
+function renderLog(asOfYmd){
+  const range = el("logRange").value;      // "14" | "30" | "90" | "ytd"
+  const includeOff = el("includeOffDays").checked;
+
+  const tbody = el("logTbody");
   tbody.innerHTML = "";
 
-  // last 14 days, starting yesterday (asOfYmd) going backward
-  for(let i=0; i<14; i++){
-    const d = new Date(asOfYmd+"T00:00:00");
-    d.setDate(d.getDate() - i);
+  const startYmd = (range === "ytd") ? yearStart(asOfYmd) : null;
+  const needed = (range === "ytd") ? Infinity : parseInt(range, 10);
+
+  let shown = 0;
+
+  for(let d=new Date(asOfYmd+"T00:00:00"); ; d.setDate(d.getDate()-1)){
     const key = ymd(d);
 
+    if(range === "ytd" && key < startYmd) break;
+
     const rec = getDayRec(key);
+
+    // Default: skip Weekend & Stat
+    if(!includeOff && isOffDay(rec.dayType)) continue;
+
     const b = getDayBudget(key);
 
     const aM = safeNum(rec.actualMaint);
@@ -379,6 +410,9 @@ function renderTwoWeekTable(asOfYmd){
     const bC = safeNum(b.cons);
     const bT = bM + bC;
 
+    const pct = bT>0 ? (aT/bT) : null;
+    const tag = tagByPct(pct);
+
     const deltaHrs = aT - bT;
     const deltaPct = (bT>0) ? ((aT/bT)-1) : null;
 
@@ -388,6 +422,7 @@ function renderTwoWeekTable(asOfYmd){
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="mono">${key}</td>
+      <td><span class="tag ${tag.cls}">${tag.txt}</span></td>
       <td>${escapeHtml(rec.dayType ?? "")}</td>
       <td class="mono">${fmt1(bM)}</td>
       <td class="mono">${fmt1(bC)}</td>
@@ -402,35 +437,38 @@ function renderTwoWeekTable(asOfYmd){
       <td>${escapeHtml(rec.notes ?? "")}</td>
     `;
     tbody.appendChild(tr);
+
+    shown++;
+    if(shown >= needed) break;
+  }
+
+  if(shown === 0){
+    tbody.innerHTML = `<tr><td colspan="14" class="hint">No rows to display for this range/filter.</td></tr>`;
   }
 }
 
-/* ---------------- render: MTD + YTD ---------------- */
+/* ---------------- render summaries ---------------- */
 function renderSummaries(asOfYmd){
   const view = el("kpiView").value;
 
-  // MTD: month start → asOf
-  const { start: mStart } = monthStartEnd(asOfYmd);
+  const mStart = monthStart(asOfYmd);
   const mBudget = sumBudgetForRange(mStart, asOfYmd);
   const mActual = sumActualsForRange(mStart, asOfYmd);
 
-  // YTD: Jan 1 → asOf
   const yStart = yearStart(asOfYmd);
   const yBudget = sumBudgetForRange(yStart, asOfYmd);
   const yActual = sumActualsForRange(yStart, asOfYmd);
 
-  // lines by division
   el("mtdMaintLine").textContent = `${fmt1(mActual.maint)} / ${fmt1(mBudget.maint)}`;
   el("mtdConstLine").textContent = `${fmt1(mActual.cons)} / ${fmt1(mBudget.cons)}`;
   el("ytdMaintLine").textContent = `${fmt1(yActual.maint)} / ${fmt1(yBudget.maint)}`;
   el("ytdConstLine").textContent = `${fmt1(yActual.cons)} / ${fmt1(yBudget.cons)}`;
 
   const pick = (obj, key) => key==="maint" ? obj.maint : key==="const" ? obj.cons : obj.total;
-  const vKey = view;
 
-  // MTD main
-  const mA = pick(mActual, vKey);
-  const mB = pick(mBudget, vKey);
+  // MTD
+  const mA = pick(mActual, view);
+  const mB = pick(mBudget, view);
   const mPct = mB>0 ? mA/mB : null;
   const mVar = mA - mB;
 
@@ -442,9 +480,9 @@ function renderSummaries(asOfYmd){
   el("mtdPct").textContent = (mPct!=null) ? `${(mPct*100).toFixed(1)}%` : "—";
   el("mtdBar").style.width = `${Math.min(100, Math.max(0, (mPct||0)*100))}%`;
 
-  // YTD main
-  const yA = pick(yActual, vKey);
-  const yB = pick(yBudget, vKey);
+  // YTD
+  const yA = pick(yActual, view);
+  const yB = pick(yBudget, view);
   const yPct = yB>0 ? yA/yB : null;
   const yVar = yA - yB;
 
@@ -457,7 +495,7 @@ function renderSummaries(asOfYmd){
   el("ytdBar").style.width = `${Math.min(100, Math.max(0, (yPct||0)*100))}%`;
 }
 
-/* ---------------- data loads ---------------- */
+/* ---------------- loads ---------------- */
 async function fetchText(url){
   const res = await fetch(url, { cache: "no-store" });
   if(!res.ok) throw new Error(`${url} HTTP ${res.status}`);
@@ -476,20 +514,20 @@ async function loadTargetsFromRepo(){
 
 /* ---------------- refresh all ---------------- */
 async function refreshAll(){
-  // As-of = yesterday (local time)
+  // As-of = yesterday
   const now = new Date();
   const asOf = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1);
   const asOfYmd = ymd(asOf);
+
   el("asOfLabel").textContent = asOfYmd;
 
-  // Load targets/calendar
   try { await loadCalendarFromRepo(); } catch(e){ console.warn(e); calendarLoaded=false; }
   try { await loadTargetsFromRepo(); } catch(e){ console.warn(e); targetsLoaded=false; }
 
   el("targetsLabel").textContent = targetsLoaded ? "Yes" : "No";
   el("calendarLabel").textContent = calendarLoaded ? "Yes" : "No";
 
-  // CRITICAL FIX: always load full year for asOf date (pulls previous months)
+  // Always load full year so prior months are available
   try{
     await loadDailyFromGoogle(yearStart(asOfYmd), yearEnd(asOfYmd));
     el("sheetStatus").textContent = `Loaded (${sheetLoadedCount})`;
@@ -499,18 +537,30 @@ async function refreshAll(){
     toast("Google Sheet fetch failed. Check Apps Script /exec URL.");
   }
 
-  renderTwoWeekTable(asOfYmd);
+  renderLog(asOfYmd);
   renderSummaries(asOfYmd);
 }
 
 /* ---------------- init ---------------- */
 (function init(){
   el("btnRefresh").addEventListener("click", refreshAll);
-  el("kpiView").addEventListener("change", ()=> {
+
+  el("kpiView").addEventListener("change", ()=>{
     const now = new Date();
     const asOf = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1);
-    const asOfYmd = ymd(asOf);
-    renderSummaries(asOfYmd);
+    renderSummaries(ymd(asOf));
+  });
+
+  el("logRange").addEventListener("change", ()=>{
+    const now = new Date();
+    const asOf = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1);
+    renderLog(ymd(asOf));
+  });
+
+  el("includeOffDays").addEventListener("change", ()=>{
+    const now = new Date();
+    const asOf = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1);
+    renderLog(ymd(asOf));
   });
 
   refreshAll();
