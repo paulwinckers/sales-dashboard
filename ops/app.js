@@ -5,7 +5,7 @@
 
 const CONFIG = {
   // Paste your Google Apps Script Web App URL here (ends with /exec)
-  SHEET_API_URL: "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE",
+  SHEET_API_URL: "https://script.google.com/macros/s/AKfycbxemOcHaO8jJL2JNvr6G3INrHOSahH3-1QYcsrb5IV19DG77lPUPtDkco_s9r8RFwmI/exec",
 
   // If you add an API key in Apps Script, put it here (optional)
   API_KEY: "",
