@@ -314,13 +314,21 @@ async function loadDailyFromGoogle(rangeStart, rangeEnd){
 }
 
 /* ---------------- targets selection logic ---------------- */
+function hasValue(v){
+  // true if cell is not empty/blank
+  return v !== null && v !== undefined && String(v).trim() !== "";
+}
+
 function getDayTargets(dateKey){
   const rec = getDayRec(dateKey);
 
-  // 1) Prefer daily targets from SHEET
-  const sM = safeNum(rec.targetMaint);
-  const sC = safeNum(rec.targetConst);
-  if((sM > 0) || (sC > 0)){
+  // 1) Prefer daily targets from SHEET if provided (including 0)
+  const sheetHasMaint = hasValue(rec.targetMaint);
+  const sheetHasConst = hasValue(rec.targetConst);
+
+  if(sheetHasMaint || sheetHasConst){
+    const sM = safeNum(rec.targetMaint); // blank becomes 0, numeric stays numeric
+    const sC = safeNum(rec.targetConst);
     return { maint:sM, cons:sC, total:sM+sC, source:"Sheet Targets" };
   }
 
@@ -334,7 +342,6 @@ function getDayTargets(dateKey){
   const fb = computeFallbackDailyTargets(dateKey);
   return { maint:fb.dailyMaint, cons:fb.dailyConst, total:fb.dailyTotal, source:"Monthly avg (prorated)" };
 }
-
 function sumTargetsForRange(startYmd, endYmd){
   // If ANY sheet targets exist, sum them across days
   let hasSheetTargets = false;
