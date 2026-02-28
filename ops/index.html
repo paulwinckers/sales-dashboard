@@ -9,21 +9,19 @@
 </head>
 
 <body>
-  <!-- Toggle Nav -->
   <div class="dash-nav">
     <a href="../">Sales</a>
     <a class="active" href="./">Ops</a>
   </div>
 
   <div class="wrap">
-    <!-- Header -->
     <div class="header">
       <div>
         <h1>Daily Operations Scoreboard</h1>
         <div class="sub">
           <span class="pill">Selected day: <strong id="displayDate">—</strong></span>
           <span class="pill">Month: <strong id="monthLabel">—</strong></span>
-          <span class="pill">Data source: <strong id="dataSourceLabel">Google Sheet</strong></span>
+          <span class="pill">Sheet: <strong id="sheetStatus">Loading…</strong></span>
           <span class="pill">Targets: <strong id="targetsLabel">Loading…</strong></span>
           <span class="pill">Calendar: <strong id="calendarLabel">Loading…</strong></span>
         </div>
@@ -34,18 +32,11 @@
         <input type="date" id="datePicker"/>
         <button class="btn secondary" id="btnNextDay">▶</button>
         <button class="btn secondary" id="btnMonthStart">Month Start</button>
-        <select id="kpiView">
-          <option value="total">View: Total</option>
-          <option value="maint">View: Maintenance</option>
-          <option value="const">View: Construction</option>
-        </select>
         <button class="btn" id="btnRefresh">Refresh</button>
       </div>
     </div>
 
-    <!-- TOP: left compact scoreboard, right daily log -->
     <div class="topLayout">
-      <!-- Left: Compact metrics -->
       <div class="leftScoreboard">
         <div class="miniCard">
           <div class="miniHeader">
@@ -71,6 +62,7 @@
             <div class="miniMeta">
               <span>Δ% <strong class="mono" id="deltaPct">—</strong></span>
               <span>Source <strong class="mono" id="targetSource">—</strong></span>
+              <span>DayType <strong class="mono" id="dayTypeLabel">—</strong></span>
             </div>
           </div>
         </div>
@@ -108,29 +100,8 @@
             </div>
           </div>
         </div>
-
-        <div class="miniCard">
-          <div class="miniHeader">
-            <div>
-              <div class="miniTitle">Google Sheet Status</div>
-              <div class="miniHint">Read-only pull (shared)</div>
-            </div>
-            <span class="tag" id="sheetTag">—</span>
-          </div>
-
-          <div class="statusBox compact">
-            <div class="miniMeta">
-              <span>Rows loaded <strong class="mono" id="rowsLoaded">—</strong></span>
-              <span>Last fetch <strong class="mono" id="lastFetch">—</strong></span>
-            </div>
-            <div class="miniHint" style="margin-top:8px">
-              Edit the sheet to amend a day, then hit <strong>Refresh</strong>.
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- Right: Daily Log -->
       <div class="rightLog">
         <div class="card">
           <div class="cardHeader">
@@ -142,6 +113,7 @@
               <button class="btn secondary" id="btnExportMonth">Export Month CSV</button>
             </div>
           </div>
+
           <div class="cardBody">
             <div class="tableWrap">
               <table>
@@ -169,14 +141,42 @@
       </div>
     </div>
 
-    <!-- SECOND ROW: MTD / YTD / Monthly Summary together -->
+    <!-- SUMMARY RANGE CONTROLS -->
+    <div class="card" style="margin-top:14px;">
+      <div class="cardHeader">
+        <div>
+          <h2>Summary Range</h2>
+          <div class="hint">Controls MTD / YTD / Monthly Summary calculations</div>
+        </div>
+        <div class="controls">
+          <select id="summaryPreset">
+            <option value="thisMonth">This Month (to today)</option>
+            <option value="lastMonth">Last Month</option>
+            <option value="thisYear">This Year (to today)</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input type="date" id="summaryStart" />
+          <input type="date" id="summaryEnd" />
+          <select id="kpiView">
+            <option value="total">View: Total</option>
+            <option value="maint">View: Maintenance</option>
+            <option value="const">View: Construction</option>
+          </select>
+        </div>
+      </div>
+      <div class="cardBody">
+        <div class="hint">
+          Targets are prorated using <strong>DayType</strong> if daily targets are not provided.
+          Best practice: add <span class="mono">TargetMaint</span> and <span class="mono">TargetConst</span> to the sheet.
+        </div>
+      </div>
+    </div>
+
     <div class="summaryRow">
       <div class="card">
         <div class="cardHeader">
-          <div>
-            <h2>MTD</h2>
-            <div class="hint">Jan 1 month start → selected day</div>
-          </div>
+          <h2>MTD</h2>
+          <div class="hint">Uses Summary Range</div>
         </div>
         <div class="cardBody">
           <div id="mtdStatus" class="statusBox">
@@ -202,10 +202,8 @@
 
       <div class="card">
         <div class="cardHeader">
-          <div>
-            <h2>YTD</h2>
-            <div class="hint">Jan 1 → selected day</div>
-          </div>
+          <h2>YTD</h2>
+          <div class="hint">Uses Summary Range</div>
         </div>
         <div class="cardBody">
           <div id="ytdStatus" class="statusBox">
@@ -231,10 +229,8 @@
 
       <div class="card">
         <div class="cardHeader">
-          <div>
-            <h2>Monthly Summary</h2>
-            <div class="hint">Whole selected month</div>
-          </div>
+          <h2>Monthly Summary</h2>
+          <div class="hint">Uses Summary Range</div>
         </div>
         <div class="cardBody">
           <div class="statusBox" id="monthSummaryBox">
@@ -283,24 +279,9 @@
 
             <div class="divider"></div>
             <div class="hint">
-              Targets use calendar sums if available; otherwise monthly-average fallback.
+              If you add <span class="mono">TargetMaint</span> / <span class="mono">TargetConst</span> to the sheet,
+              targets will be exact (including weekends/OT).
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- (Optional) data debug -->
-    <div style="margin-top:14px;">
-      <div class="card">
-        <div class="cardHeader">
-          <h2>Targets Files</h2>
-          <div class="hint">Loaded from repo /data</div>
-        </div>
-        <div class="cardBody">
-          <div class="meta">
-            <span>Calendar <strong class="mono" id="calendarDebug">—</strong></span>
-            <span>Targets <strong class="mono" id="targetsDebug">—</strong></span>
           </div>
         </div>
       </div>
