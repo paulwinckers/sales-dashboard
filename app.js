@@ -1,35 +1,15 @@
-// ----------------------------
-// CONFIG — EDIT THESE ONLY
-// ----------------------------
+// ------------------------------------------------------------
+// CONFIG
+// ------------------------------------------------------------
+const LOGBOOK_URL =
+  "https://script.google.com/macros/s/AKfycbxemOcHaO8jJL2JNvr6G3INrHOSahH3-1QYcsrb5IV19DG77lPUPtDkco_s9r8RFwmI/exec";
 
-// 1) Put your published Google Sheet CSV URL here (Publish to web → CSV)
-const LOGBOOK_CSV_URL = "https://script.google.com/macros/s/AKfycbxemOcHaO8jJL2JNvr6G3INrHOSahH3-1QYcsrb5IV19DG77lPUPtDkco_s9r8RFwmI/exec";
+// SalesAct headers (you provided):
+// Month, ActualConstRevMTD, ActualMaintRevMTD, ActualConstrHoursMTD, ActualMaintHoursMTD, UpdatedAt, UpdatedBy
 
-// 2) Tell the parser which columns to use from that CSV.
-// If you already have separate columns for Construction/Maintenance actual revenue,
-// set MODE="separate_columns" and configure those column names.
-//
-// If your logbook is transactional (many rows), set MODE="rows_with_division".
-const LOGBOOK_MODE = "rows_with_division"; // "rows_with_division" or "separate_columns"
-
-// Common: a Date column like 2026-03-15 OR a Month column like 2026-03
-const LOGBOOK_DATE_COL = "Date";      // used in rows_with_division mode
-const LOGBOOK_MONTH_COL = "Month";    // if you have yyyy-mm directly, use this
-
-// Transactional mode:
-const LOGBOOK_AMOUNT_COL = "Amount";
-const LOGBOOK_DIVISION_COL = "Division"; // values containing "Construction" or maintenance keywords
-
-// Separate-columns mode:
-const LOGBOOK_CONSTR_ACTUAL_COL = "Construction Actual Revenue";
-const LOGBOOK_MAINT_ACTUAL_COL  = "Maintenance Actual Revenue";
-
-// Maintenance keywords used when parsing division strings
-const MAINT_KEYWORDS = ["maintenance", "commercial maintenance", "residential maintenance", "irrigation", "lighting"];
-
-// ----------------------------
+// ------------------------------------------------------------
 // Static file paths (GitHub Pages safe)
-// ----------------------------
+// ------------------------------------------------------------
 const BASE = new URL(".", window.location.href).href;
 const FILES = {
   targetsCsv: new URL("data/targets.csv", BASE).toString(),
@@ -41,15 +21,20 @@ const FILES = {
 const TICKET_ACTIVE_STATUS_WORDS = ["open", "scheduled"];
 const WON_STATUS_WORDS = ["won", "closed won", "sold"];
 
-// ----------------------------
+// Chart colors
+const BLUE = "rgba(54, 162, 235, 1)";
+const GREEN = "rgba(34, 197, 94, 0.9)";      // bright green
+const YELLOW = "rgba(250, 204, 21, 0.9)";    // bright yellow
+
+// ------------------------------------------------------------
 // Helpers
-// ----------------------------
+// ------------------------------------------------------------
 function isConstructionDivision(name) {
   return String(name || "").toLowerCase().includes("construction");
 }
 function isMaintenanceDivision(name) {
   const s = String(name || "").toLowerCase();
-  return MAINT_KEYWORDS.some(k => s.includes(k));
+  return s.includes("maintenance") || s.includes("irrigation") || s.includes("lighting");
 }
 function isTicketActive(status) {
   const s = String(status || "").trim().toLowerCase();
@@ -95,6 +80,17 @@ function parseDateAny(v) {
 
   return null;
 }
+function parseExcelDate(v) {
+  if (!v) return null;
+  if (v instanceof Date && Number.isFinite(v.getTime())) return v;
+
+  if (typeof v === "number" && Number.isFinite(v)) {
+    const o = XLSX.SSF.parse_date_code(v);
+    if (!o) return null;
+    return new Date(o.y, o.m - 1, o.d);
+  }
+  return parseDateAny(v);
+}
 function monthKeyFromDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -118,13 +114,18 @@ function monthKeyFromTargetsLabel(label) {
     if (yy >= 2000 && mm >= 1 && mm <= 12) return `${yy}-${String(mm).padStart(2, "0")}`;
   }
 
+  // Already yyyy-mm
+  if (/^\d{4}-\d{2}$/.test(s)) return s;
+
   return null;
 }
+
 async function fetchText(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Fetch failed ${res.status} for ${url}`);
   return await res.text();
 }
+
 function bucketSumByMonth(items, getDate, getValue, monthKeys) {
   const out = {};
   for (const k of monthKeys) out[k] = 0;
@@ -138,9 +139,11 @@ function bucketSumByMonth(items, getDate, getValue, monthKeys) {
   }
   return out;
 }
+
 function sumMonths(seriesByMonth, monthKeys) {
   return monthKeys.reduce((acc, k) => acc + (seriesByMonth[k] || 0), 0);
 }
+
 function projectionForMonth(mk, actualMtd) {
   const now = new Date();
   const currentMk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -149,12 +152,44 @@ function projectionForMonth(mk, actualMtd) {
   const day = now.getDate();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   if (day <= 0) return actualMtd;
+
   return (actualMtd / day) * daysInMonth;
 }
 
-// ----------------------------
+// Spread maintenance pipeline weighted hours from Start Date month -> November inclusive
+function bucketMaintenancePipelineSpread(pipelineRows, monthKeys) {
+  const out = {};
+  for (const k of monthKeys) out[k] = 0;
+
+  for (const p of pipelineRows) {
+    if (!p.startDate) continue;
+
+    const y = p.startDate.getFullYear();
+    const startM = p.startDate.getMonth() + 1;
+    const endM = 11; // November
+    const total = Number(p.weightedHours || 0);
+
+    if (startM > endM) {
+      const mk = monthKeyFromDate(p.startDate);
+      if (mk in out) out[mk] += total;
+      continue;
+    }
+
+    const monthsCount = (endM - startM + 1);
+    const perMonth = total / monthsCount;
+
+    for (let m = startM; m <= endM; m++) {
+      const mk = `${y}-${String(m).padStart(2, "0")}`;
+      if (mk in out) out[mk] += perMonth;
+    }
+  }
+
+  return out;
+}
+
+// ------------------------------------------------------------
 // Loaders
-// ----------------------------
+// ------------------------------------------------------------
 async function loadTargets(url) {
   const text = await fetchText(url);
 
@@ -166,7 +201,8 @@ async function loadTargets(url) {
   });
 
   const fields = parsed.meta?.fields || [];
-  const findCol = (want) => fields.find(f => String(f).trim().toLowerCase() === want.toLowerCase()) || want;
+  const findCol = (want) =>
+    fields.find(f => String(f).trim().toLowerCase() === want.toLowerCase()) || want;
 
   const COL = {
     Month: findCol("Month"),
@@ -206,10 +242,10 @@ async function loadCapacity(url, monthKeys) {
   for (const mk of monthKeys) { constCap[mk] = 0; maintCap[mk] = 0; }
 
   for (const r of parsed.data || []) {
-    const mk = String(r["month"] || "").trim();
+    const mk = String(r.month || r.Month || "").trim();
     if (!mk || !(mk in constCap)) continue;
-    constCap[mk] = parseNumberLoose(r["constcap"]);
-    maintCap[mk] = parseNumberLoose(r["maintcap"]);
+    constCap[mk] = parseNumberLoose(r.constcap ?? r.ConstCap ?? r.Constcap);
+    maintCap[mk] = parseNumberLoose(r.maintcap ?? r.MaintCap ?? r.Maintcap);
   }
 
   return { constCap, maintCap };
@@ -239,7 +275,6 @@ async function loadWorkTickets(url) {
   const wb = XLSX.read(arrayBuffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
-
   if (!json.length) return [];
 
   const keys = Object.keys(json[0] || {});
@@ -256,59 +291,44 @@ async function loadWorkTickets(url) {
 
   return json.map(r => ({
     status: String(COL_STATUS ? r[COL_STATUS] : "").trim(),
-    schedDate: parseDateAny(COL_DATE ? r[COL_DATE] : null) || parseExcelDate(COL_DATE ? r[COL_DATE] : null),
+    schedDate: parseExcelDate(COL_DATE ? r[COL_DATE] : null),
     estHrs: parseNumberLoose(COL_HRS ? r[COL_HRS] : 0),
     division: String(COL_DIV ? r[COL_DIV] : "").trim(),
   })).filter(t => t.schedDate && t.estHrs > 0);
 }
 
-// ---- Google Sheet (published CSV) actual revenue loader ----
-async function loadActualRevenueFromLogbook(url, monthKeys) {
+async function loadSalesActMonthly(baseUrl, monthKeys) {
+  // Returns: byMonth[yyyy-mm] = { constrRevMTD, maintRevMTD, constrHrsMTD, maintHrsMTD, updatedAt, updatedBy }
   const out = {};
-  for (const mk of monthKeys) out[mk] = { constr: 0, maint: 0 };
-
-  if (!url || url.includes("PASTE_YOUR_PUBLISHED")) return out;
-
-  const text = await fetchText(url);
-  const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, delimiter: "" });
-
-  const rows = parsed.data || [];
-
-  if (LOGBOOK_MODE === "separate_columns") {
-    for (const r of rows) {
-      const mk = String(r[LOGBOOK_MONTH_COL] || "").trim();
-      if (!mk || !(mk in out)) continue;
-      out[mk].constr += parseCurrency(r[LOGBOOK_CONSTR_ACTUAL_COL]);
-      out[mk].maint  += parseCurrency(r[LOGBOOK_MAINT_ACTUAL_COL]);
-    }
-    return out;
+  for (const mk of monthKeys) {
+    out[mk] = { constrRevMTD: 0, maintRevMTD: 0, constrHrsMTD: 0, maintHrsMTD: 0, updatedAt: "", updatedBy: "" };
   }
 
-  // rows_with_division mode
+  const url = `${baseUrl}?tab=SalesAct`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`SalesAct HTTP ${res.status}`);
+
+  const payload = await res.json();
+  const rows = payload?.rows || [];
+
   for (const r of rows) {
-    let mk = String(r[LOGBOOK_MONTH_COL] || "").trim();
-    if (!mk) {
-      const d = parseDateAny(r[LOGBOOK_DATE_COL]);
-      if (d) mk = monthKeyFromDate(d);
-    }
+    const mk = String(r.Month || "").trim();
     if (!mk || !(mk in out)) continue;
 
-    const amt = parseCurrency(r[LOGBOOK_AMOUNT_COL]);
-    const div = String(r[LOGBOOK_DIVISION_COL] || "").toLowerCase();
-
-    if (isConstructionDivision(div)) out[mk].constr += amt;
-    else if (isMaintenanceDivision(div)) out[mk].maint += amt;
-    else {
-      // if no clear division, ignore (or change to allocate somewhere)
-    }
+    out[mk].constrRevMTD = parseCurrency(r.ActualConstRevMTD);
+    out[mk].maintRevMTD = parseCurrency(r.ActualMaintRevMTD);
+    out[mk].constrHrsMTD = parseNumberLoose(r.ActualConstrHoursMTD);
+    out[mk].maintHrsMTD = parseNumberLoose(r.ActualMaintHoursMTD);
+    out[mk].updatedAt = r.UpdatedAt ? String(r.UpdatedAt) : "";
+    out[mk].updatedBy = r.UpdatedBy ? String(r.UpdatedBy) : "";
   }
 
   return out;
 }
 
-// ----------------------------
+// ------------------------------------------------------------
 // Charts
-// ----------------------------
+// ------------------------------------------------------------
 let chartConstr = null;
 let chartMaint = null;
 let chartRevenueYear = null;
@@ -321,27 +341,43 @@ function buildHoursChart(canvas, labels, targetLine, capLine, barsTickets, barsP
     data: {
       labels,
       datasets: [
-        { type: "line", label: "Target Hours", data: targetLine, borderWidth: 2, pointRadius: 2, tension: 0.2 },
-
-        // ✅ NEW capacity line
-        { type: "line", label: "Capacity", data: capLine, borderWidth: 2, pointRadius: 0, tension: 0.2 },
-
-        // ✅ Bright green tickets
+        // ✅ Target line BLUE
+        {
+          type: "line",
+          label: "Target Hours",
+          data: targetLine,
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: 0.2,
+          borderColor: BLUE,
+          pointBackgroundColor: BLUE,
+        },
+        // ✅ Capacity line dashed BLUE
+        {
+          type: "line",
+          label: "Capacity",
+          data: capLine,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.2,
+          borderColor: BLUE,
+          borderDash: [6, 6],
+        },
+        // ✅ Work tickets bright green
         {
           type: "bar",
           label: "Work Tickets (Open/Scheduled)",
           data: barsTickets,
           stack: "stack1",
-          backgroundColor: "rgba(34, 197, 94, 0.9)",
+          backgroundColor: GREEN,
         },
-
-        // ✅ Bright yellow opportunities
+        // ✅ Opportunities bright yellow
         {
           type: "bar",
           label: "Opportunities (Pipeline Weighted Hours)",
           data: barsPipeline,
           stack: "stack1",
-          backgroundColor: "rgba(250, 204, 21, 0.9)",
+          backgroundColor: YELLOW,
         },
       ],
     },
@@ -350,7 +386,10 @@ function buildHoursChart(canvas, labels, targetLine, capLine, barsTickets, barsP
       maintainAspectRatio: false,
       animation: false,
       plugins: { legend: { position: "top" }, tooltip: { mode: "index", intersect: false } },
-      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+      },
     },
   });
 }
@@ -366,7 +405,12 @@ function buildRevenueYearChart(canvas, target, pipeUnweighted, pipeWeighted) {
         { label: "Pipeline $ (Weighted)", data: [pipeWeighted] },
       ],
     },
-    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: { y: { beginAtZero: true } },
+    },
   });
 }
 
@@ -377,17 +421,22 @@ function buildRevenuePaceChart(canvas, targetMonthRev, actualMonthRev, projected
       labels: ["Revenue"],
       datasets: [
         { label: "Target (Full Month)", data: [targetMonthRev] },
-        { label: "Actual (From Logbook)", data: [actualMonthRev] },
+        { label: "Actual (MTD from SalesAct)", data: [actualMonthRev] },
         { label: "Projected (Full Month)", data: [projectedFullMonthRev] },
       ],
     },
-    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: { y: { beginAtZero: true } },
+    },
   });
 }
 
-// ----------------------------
-// UI & rendering
-// ----------------------------
+// ------------------------------------------------------------
+// UI helpers
+// ------------------------------------------------------------
 function populateMonthSelect(monthKeys) {
   const sel = document.getElementById("asOfMonth");
   sel.innerHTML = "";
@@ -409,7 +458,7 @@ function getScope(view) {
     return {
       targetYearRev: (t) => sumMonths(t.constrRev, t.monthKeys),
       targetMonthRev: (t, mk) => t.constrRev[mk] || 0,
-      actualMonthRev: (a) => a?.constr || 0,
+      actualMonthRev: (a) => a?.constrRevMTD || 0,
       pipeFilter: (p) => isConstructionDivision(p.division),
     };
   }
@@ -417,7 +466,7 @@ function getScope(view) {
     return {
       targetYearRev: (t) => sumMonths(t.maintRev, t.monthKeys),
       targetMonthRev: (t, mk) => t.maintRev[mk] || 0,
-      actualMonthRev: (a) => a?.maint || 0,
+      actualMonthRev: (a) => a?.maintRevMTD || 0,
       pipeFilter: (p) => isMaintenanceDivision(p.division) && !isConstructionDivision(p.division),
     };
   }
@@ -428,11 +477,14 @@ function getScope(view) {
       return s;
     },
     targetMonthRev: (t, mk) => (t.constrRev[mk] || 0) + (t.maintRev[mk] || 0),
-    actualMonthRev: (a) => (a?.constr || 0) + (a?.maint || 0),
+    actualMonthRev: (a) => (a?.constrRevMTD || 0) + (a?.maintRevMTD || 0),
     pipeFilter: (p) => isConstructionDivision(p.division) || isMaintenanceDivision(p.division),
   };
 }
 
+// ------------------------------------------------------------
+// Render
+// ------------------------------------------------------------
 function renderAll(state) {
   if (!state.targets?.monthKeys?.length) return;
 
@@ -455,9 +507,10 @@ function renderAll(state) {
     pipeYearWeighted
   );
 
-  // KPI: Revenue pace (uses Logbook actuals)
+  // KPI: Revenue pace (SalesAct MTD)
   const targetMonthRev = scope.targetMonthRev(state.targets, mk);
-  const actualMonthRev = scope.actualMonthRev(state.actualRevenueByMonth[mk]);
+  const salesAct = state.salesActByMonth?.[mk] || {};
+  const actualMonthRev = scope.actualMonthRev(salesAct);
   const projectedRev = projectionForMonth(mk, actualMonthRev);
 
   chartRevenuePace = destroy(chartRevenuePace);
@@ -468,7 +521,7 @@ function renderAll(state) {
     projectedRev
   );
 
-  // Hours by month: tickets + pipeline (exclude won)
+  // Hours by month: tickets + pipeline weighted hours (exclude won)
   const activeTickets = state.tickets.filter(t => isTicketActive(t.status));
   const pipePotential = state.pipeline.filter(p => !isWonPipelineStatus(p.status));
 
@@ -478,24 +531,26 @@ function renderAll(state) {
     t => t.estHrs,
     monthKeys
   );
+
   const ticketMaint = bucketSumByMonth(
     activeTickets.filter(t => isMaintenanceDivision(t.division) && !isConstructionDivision(t.division)),
     t => t.schedDate,
     t => t.estHrs,
     monthKeys
   );
+
   const pipeConstr = bucketSumByMonth(
     pipePotential.filter(p => isConstructionDivision(p.division)),
     p => p.startDate,
     p => p.weightedHours,
     monthKeys
   );
-  const pipeMaint = bucketSumByMonth(
-    pipePotential.filter(p => isMaintenanceDivision(p.division) && !isConstructionDivision(p.division)),
-    p => p.startDate,
-    p => p.weightedHours,
-    monthKeys
+
+  // Maintenance pipeline spread start month -> Nov
+  const maintPipeRows = pipePotential.filter(
+    p => isMaintenanceDivision(p.division) && !isConstructionDivision(p.division)
   );
+  const pipeMaintMap = bucketMaintenancePipelineSpread(maintPipeRows, monthKeys);
 
   const constrTarget = monthKeys.map(m => state.targets.constrHours[m] || 0);
   const maintTarget  = monthKeys.map(m => state.targets.maintHours[m] || 0);
@@ -507,7 +562,7 @@ function renderAll(state) {
   const maintTickets  = monthKeys.map(m => ticketMaint[m] || 0);
 
   const constrPipe = monthKeys.map(m => pipeConstr[m] || 0);
-  const maintPipe  = monthKeys.map(m => pipeMaint[m] || 0);
+  const maintPipe  = monthKeys.map(m => pipeMaintMap[m] || 0);
 
   chartConstr = destroy(chartConstr);
   chartMaint = destroy(chartMaint);
@@ -530,104 +585,124 @@ function renderAll(state) {
     maintPipe
   );
 
-  document.getElementById("lastRefresh").textContent = new Date().toLocaleString();
+  const lr = document.getElementById("lastRefresh");
+  if (lr) lr.textContent = new Date().toLocaleString();
 }
 
-// ----------------------------
-// Data load + wiring
-// ----------------------------
+// ------------------------------------------------------------
+// Load all data + wiring
+// ------------------------------------------------------------
 async function loadAllData(state) {
-  const setStatus = (id, ok, msg) => {
-    const pill = document.getElementById(id);
-    if (!pill) return;
-    pill.textContent = msg;
-    pill.style.background = ok ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)";
-  };
+  const tPath = document.getElementById("targetsPath");
+  const pPath = document.getElementById("pipelinePath");
+  const wPath = document.getElementById("ticketsPath");
 
-  // Paths
-  document.getElementById("targetsPath").textContent = FILES.targetsCsv;
-  document.getElementById("pipelinePath").textContent = FILES.pipelineCsv;
-  document.getElementById("ticketsPath").textContent = FILES.workTicketsXlsx;
+  const tPill = document.getElementById("targetsStatus");
+  const pPill = document.getElementById("pipelineStatus");
+  const wPill = document.getElementById("ticketsStatus");
+
+  if (tPath) tPath.textContent = FILES.targetsCsv;
+  if (pPath) pPath.textContent = FILES.pipelineCsv;
+  if (wPath) wPath.textContent = FILES.workTicketsXlsx;
 
   // Targets
   try {
     state.targets = await loadTargets(FILES.targetsCsv);
+    if (tPill) {
+      tPill.textContent = `Loaded (${state.targets.monthKeys.length} months)`;
+      tPill.style.background = "rgba(34,197,94,0.15)";
+    }
     populateMonthSelect(state.targets.monthKeys);
-    setStatus("targetsStatus", true, `Loaded (${state.targets.monthKeys.length} months)`);
   } catch (e) {
-    console.error(e);
-    setStatus("targetsStatus", false, `Failed: ${e.message || e}`);
+    console.error("Targets failed:", e);
+    if (tPill) {
+      tPill.textContent = `Failed: ${e?.message || e}`;
+      tPill.style.background = "rgba(239,68,68,0.15)";
+    }
     throw e;
   }
 
-  // Capacity (depends on monthKeys)
+  // Capacity (depends on months)
   try {
     state.capacity = await loadCapacity(FILES.capacityCsv, state.targets.monthKeys);
   } catch (e) {
     console.error("Capacity failed:", e);
-    // still render with zeros
     state.capacity = { constCap: {}, maintCap: {} };
   }
 
   // Pipeline
   try {
     state.pipeline = await loadPipeline(FILES.pipelineCsv);
-    setStatus("pipelineStatus", true, `Loaded (${state.pipeline.length})`);
+    if (pPill) {
+      pPill.textContent = `Loaded (${state.pipeline.length})`;
+      pPill.style.background = "rgba(34,197,94,0.15)";
+    }
   } catch (e) {
-    console.error(e);
+    console.error("Pipeline failed:", e);
     state.pipeline = [];
-    setStatus("pipelineStatus", false, `Failed: ${e.message || e}`);
+    if (pPill) {
+      pPill.textContent = `Failed: ${e?.message || e}`;
+      pPill.style.background = "rgba(239,68,68,0.15)";
+    }
   }
 
-  // Work tickets
+  // Work Tickets
   try {
     state.tickets = await loadWorkTickets(FILES.workTicketsXlsx);
-    setStatus("ticketsStatus", true, `Loaded (${state.tickets.length})`);
+    if (wPill) {
+      wPill.textContent = `Loaded (${state.tickets.length})`;
+      wPill.style.background = "rgba(34,197,94,0.15)";
+    }
   } catch (e) {
-    console.error(e);
+    console.error("Work tickets failed:", e);
     state.tickets = [];
-    setStatus("ticketsStatus", false, `Failed: ${e.message || e}`);
+    if (wPill) {
+      wPill.textContent = `Failed: ${e?.message || e}`;
+      wPill.style.background = "rgba(239,68,68,0.15)";
+    }
   }
 
-  // Logbook actual revenue
+  // SalesAct (Actuals)
   try {
-    state.actualRevenueByMonth = await loadActualRevenueFromLogbook(LOGBOOK_CSV_URL, state.targets.monthKeys);
+    state.salesActByMonth = await loadSalesActMonthly(LOGBOOK_URL, state.targets.monthKeys);
   } catch (e) {
-    console.error("Logbook failed:", e);
-    // default to zeros
-    state.actualRevenueByMonth = {};
-    for (const mk of state.targets.monthKeys) state.actualRevenueByMonth[mk] = { constr: 0, maint: 0 };
+    console.error("SalesAct load failed:", e);
+    state.salesActByMonth = {};
+    for (const mk of state.targets.monthKeys) {
+      state.salesActByMonth[mk] = { constrRevMTD: 0, maintRevMTD: 0, constrHrsMTD: 0, maintHrsMTD: 0 };
+    }
   }
 }
 
 function wireControls(state) {
-  document.getElementById("refreshBtn").addEventListener("click", async () => {
-    await loadAllData(state);
-    renderAll(state);
-  });
+  const refreshBtn = document.getElementById("refreshBtn");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", async () => {
+      await loadAllData(state);
+      renderAll(state);
+    });
+  }
 
-  document.getElementById("viewToggle").addEventListener("change", () => renderAll(state));
-  document.getElementById("asOfMonth").addEventListener("change", () => renderAll(state));
+  const viewToggle = document.getElementById("viewToggle");
+  if (viewToggle) viewToggle.addEventListener("change", () => renderAll(state));
+
+  const asOfMonth = document.getElementById("asOfMonth");
+  if (asOfMonth) asOfMonth.addEventListener("change", () => renderAll(state));
 }
 
-// ----------------------------
-// Init
-// ----------------------------
+// ------------------------------------------------------------
+// Init (no top-level await)
+// ------------------------------------------------------------
 (async function init() {
   const state = {
     targets: null,
     capacity: { constCap: {}, maintCap: {} },
     pipeline: [],
     tickets: [],
-    actualRevenueByMonth: {},
+    salesActByMonth: {},
   };
 
   wireControls(state);
   await loadAllData(state);
   renderAll(state);
 })();
-
-
-
-
-
