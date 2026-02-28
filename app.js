@@ -3,7 +3,7 @@
 // ----------------------------
 
 // 1) Put your published Google Sheet CSV URL here (Publish to web → CSV)
-const LOGBOOK_CSV_URL = "PASTE_YOUR_PUBLISHED_CSV_URL_HERE";
+const LOGBOOK_CSV_URL = "https://script.google.com/macros/s/AKfycbxemOcHaO8jJL2JNvr6G3INrHOSahH3-1QYcsrb5IV19DG77lPUPtDkco_s9r8RFwmI/exec";
 
 // 2) Tell the parser which columns to use from that CSV.
 // If you already have separate columns for Construction/Maintenance actual revenue,
@@ -626,6 +626,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
