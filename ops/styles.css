@@ -1,126 +1,338 @@
+/* =====================================================
+   OPERATIONS DASHBOARD – COMPLETE STYLESHEET
+   ===================================================== */
+
+:root{
+  --bg: #070A12;
+  --panel: rgba(255,255,255,0.06);
+  --panel-strong: rgba(255,255,255,0.08);
+  --stroke: rgba(255,255,255,0.12);
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.65);
+
+  --green: #38f2a6;
+  --yellow: #ffd85a;
+  --red: #ff5d7a;
+  --aqua: #37e9ff;
+}
+
 /* =========================
-   OPS DASHBOARD: TV-OBVIOUS STATUS COLORS
-   Paste at bottom of styles.css
+   Base
    ========================= */
 
-/* Bigger, higher-contrast tags */
-.tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+html, body{
+  height: 100%;
+}
+
+body{
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background:
+    radial-gradient(1200px 600px at 15% 0%, rgba(55,233,255,0.10), transparent 60%),
+    radial-gradient(900px 500px at 85% 10%, rgba(110,255,210,0.08), transparent 60%),
+    var(--bg);
+  color: var(--text);
+}
+
+a{
+  color: var(--aqua);
+  text-decoration: none;
+}
+
+a:hover{
+  text-decoration: underline;
+}
+
+/* =========================
+   Navigation
+   ========================= */
+
+.dash-nav{
+  display:flex;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--stroke);
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(6px);
+}
+
+.dash-nav a{
+  padding: 8px 14px;
+  border-radius: 10px;
+  color: var(--text);
+}
+
+.dash-nav a.active{
+  background: rgba(55,233,255,0.15);
+  border: 1px solid rgba(55,233,255,0.3);
+}
+
+/* =========================
+   Layout
+   ========================= */
+
+.wrap{
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px 20px 50px;
+}
+
+.header{
+  display:flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+}
+
+h1{
+  font-size: 34px;
+  margin: 12px 0 6px;
+}
+
+h2{
+  margin: 0;
+  font-size: 20px;
+}
+
+.sub{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.pill{
   padding: 6px 12px;
   border-radius: 999px;
-  font-weight: 800;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  font-size: 12px;
-  line-height: 1;
-  border: 1px solid rgba(255,255,255,0.18);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.35) inset,
-    0 8px 18px rgba(0,0,0,0.35);
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  font-size: 13px;
 }
 
-/* Optional "dot" indicator before tag text */
-.tag::before {
-  content: "";
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  margin-right: 8px;
-  box-shadow: 0 0 10px currentColor;
-  background: currentColor;
-  opacity: 0.9;
+/* =========================
+   Controls
+   ========================= */
+
+.controls{
+  display:flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-/* Green / Yellow / Red tags */
-.tag.good {
-  color: #001a10;
-  background: linear-gradient(180deg, rgba(70,255,170,1), rgba(30,210,120,1));
-  border-color: rgba(70,255,170,0.55);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.35) inset,
-    0 0 22px rgba(70,255,170,0.55),
-    0 10px 24px rgba(0,0,0,0.35);
+select{
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 10px;
 }
 
-.tag.warn {
-  color: #1a1200;
-  background: linear-gradient(180deg, rgba(255,224,90,1), rgba(245,175,40,1));
-  border-color: rgba(255,224,90,0.6);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.35) inset,
-    0 0 22px rgba(255,224,90,0.45),
-    0 10px 24px rgba(0,0,0,0.35);
+input[type="checkbox"]{
+  accent-color: var(--aqua);
+  transform: scale(1.1);
 }
 
-.tag.bad {
-  color: #220006;
-  background: linear-gradient(180deg, rgba(255,120,150,1), rgba(235,40,70,1));
-  border-color: rgba(255,120,150,0.6);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.35) inset,
-    0 0 24px rgba(255,80,110,0.50),
-    0 10px 24px rgba(0,0,0,0.35);
+/* =========================
+   Cards
+   ========================= */
+
+.card{
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.4);
 }
 
-/* If you use neutral/no-budget tags (cls="") give it a clear look */
-.tag:not(.good):not(.warn):not(.bad) {
-  color: rgba(255,255,255,0.92);
-  background: rgba(140,160,190,0.18);
-  border-color: rgba(255,255,255,0.18);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.25) inset,
-    0 10px 24px rgba(0,0,0,0.25);
-}
-.tag:not(.good):not(.warn):not(.bad)::before {
-  opacity: 0.55;
+.cardHeader{
+  padding: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  display:flex;
+  justify-content: space-between;
+  align-items: flex-end;
 }
 
-/* Make the summary status boxes more pronounced as well */
-.statusBox.good {
-  border: 2px solid rgba(70,255,170,0.55);
-  box-shadow: 0 0 26px rgba(70,255,170,0.18);
-}
-.statusBox.warn {
-  border: 2px solid rgba(255,224,90,0.55);
-  box-shadow: 0 0 26px rgba(255,224,90,0.14);
-}
-.statusBox.bad {
-  border: 2px solid rgba(255,120,150,0.55);
-  box-shadow: 0 0 26px rgba(255,80,110,0.14);
+.cardBody{
+  padding: 16px;
 }
 
-/* Make the progress bars pop */
-.bar {
-  background: rgba(255,255,255,0.12);
-  border-radius: 999px;
-  height: 14px;
-  overflow: hidden;
-}
-.bar > div {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(55,233,255,0.9), rgba(110,255,210,0.9));
-  box-shadow: 0 0 18px rgba(55,233,255,0.25);
+.hint{
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
 }
 
-/* Table readability improvements for a wall TV */
-.tableWrap table {
+/* =========================
+   Tables
+   ========================= */
+
+.tableWrap{
+  overflow:auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+table{
+  width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  min-width: 1100px;
 }
-.tableWrap thead th {
+
+thead th{
   position: sticky;
   top: 0;
-  z-index: 2;
-  background: rgba(10, 14, 24, 0.92);
+  background: rgba(8,10,18,0.95);
   backdrop-filter: blur(6px);
-  border-bottom: 1px solid rgba(255,255,255,0.14);
+  font-size: 13px;
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--stroke);
 }
-.tableWrap tbody tr:hover {
+
+tbody td{
+  padding: 10px 12px;
+  font-size: 13.5px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+tbody tr:nth-child(odd){
+  background: rgba(255,255,255,0.03);
+}
+
+tbody tr:hover{
   background: rgba(55,233,255,0.08);
 }
-.tableWrap td, .tableWrap th {
-  padding: 10px 12px;
+
+.mono{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================
+   Status Tags
+   ========================= */
+
+.tag{
+  display:inline-flex;
+  align-items:center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.tag::before{
+  content:"";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.tag.good{
+  color: #002218;
+  background: linear-gradient(180deg, var(--green), #23c47f);
+}
+
+.tag.warn{
+  color: #2b1e00;
+  background: linear-gradient(180deg, var(--yellow), #e3b52e);
+}
+
+.tag.bad{
+  color: #2a0008;
+  background: linear-gradient(180deg, var(--red), #c92745);
+}
+
+.tag:not(.good):not(.warn):not(.bad){
+  color: var(--muted);
+  background: rgba(255,255,255,0.08);
+}
+
+/* =========================
+   Summary Section
+   ========================= */
+
+.summaryRow{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.statusBox{
+  padding: 18px;
+  border-radius: 16px;
+  border: 2px solid transparent;
+}
+
+.statusBox.good{
+  border-color: var(--green);
+  box-shadow: 0 0 25px rgba(56,242,166,0.25);
+}
+
+.statusBox.warn{
+  border-color: var(--yellow);
+  box-shadow: 0 0 25px rgba(255,216,90,0.2);
+}
+
+.statusBox.bad{
+  border-color: var(--red);
+  box-shadow: 0 0 25px rgba(255,93,122,0.25);
+}
+
+.bigNumber{
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.small{
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* =========================
+   Progress Bars
+   ========================= */
+
+.bar{
+  height: 14px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.bar > div{
+  height: 100%;
+  background: linear-gradient(90deg, var(--aqua), #6effd2);
+  box-shadow: 0 0 20px rgba(55,233,255,0.3);
+}
+
+/* =========================
+   Toast
+   ========================= */
+
+.toast{
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid var(--stroke);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 200ms ease;
+  pointer-events: none;
+}
+
+.toast.show{
+  opacity: 1;
+  transform: translateY(0);
 }
