@@ -16,139 +16,182 @@
   </div>
 
   <div class="wrap">
-
+    <!-- Header -->
     <div class="header">
       <div>
-        <h1>Daily Operations Scoreboard (Ops)</h1>
+        <h1>Daily Operations Scoreboard</h1>
         <div class="sub">
           <span class="pill">Selected day: <strong id="displayDate">—</strong></span>
           <span class="pill">Month: <strong id="monthLabel">—</strong></span>
-          <span class="pill">Target source: <strong id="targetSource">—</strong></span>
-          <span class="pill">Calendar: <strong id="calendarLabel">Loading…</strong></span>
+          <span class="pill">Data source: <strong id="dataSourceLabel">Google Sheet</strong></span>
           <span class="pill">Targets: <strong id="targetsLabel">Loading…</strong></span>
+          <span class="pill">Calendar: <strong id="calendarLabel">Loading…</strong></span>
         </div>
       </div>
 
       <div class="controls">
-        <button class="btn secondary" id="btnPrevDay">◀ Prev</button>
+        <button class="btn secondary" id="btnPrevDay">◀</button>
         <input type="date" id="datePicker"/>
-        <button class="btn secondary" id="btnNextDay">Next ▶</button>
-        <button class="btn" id="btnToday">Today</button>
-        <button class="btn secondary" id="btnGoYesterday">Yesterday</button>
-        <button class="btn secondary" id="btnReloadData">Reload /data</button>
-        <button class="btn danger" id="btnClearDay">Clear day</button>
+        <button class="btn secondary" id="btnNextDay">▶</button>
+        <button class="btn secondary" id="btnMonthStart">Month Start</button>
+        <select id="kpiView">
+          <option value="total">View: Total</option>
+          <option value="maint">View: Maintenance</option>
+          <option value="const">View: Construction</option>
+        </select>
+        <button class="btn" id="btnRefresh">Refresh</button>
       </div>
     </div>
 
-    <div class="gridTop">
-      <!-- Production -->
-      <div class="card">
-        <div class="cardHeader">
-          <h2>Daily Production</h2>
-          <div class="hint">Green ≥100% • Yellow 95–99.9% • Red &lt;95% • 0 target = neutral</div>
-        </div>
-        <div class="cardBody">
-          <div id="prodStatus" class="statusBox">
-            <div class="kpiBig">
-              <div class="label">Daily target hours (Maintenance + Construction)</div>
-              <div class="value mono" id="dailyTarget">—</div>
-              <div class="meta">
-                <span>Maint/day: <strong class="mono" id="dailyTargetMaint">—</strong></span>
-                <span>Const/day: <strong class="mono" id="dailyTargetConst">—</strong></span>
-                <span>Actual total: <strong class="mono" id="actualTotal">—</strong></span>
-                <span>Delta: <strong class="mono" id="deltaPct">—</strong></span>
-              </div>
+    <!-- TOP: left compact scoreboard, right daily log -->
+    <div class="topLayout">
+      <!-- Left: Compact metrics -->
+      <div class="leftScoreboard">
+        <div class="miniCard">
+          <div class="miniHeader">
+            <div>
+              <div class="miniTitle">Daily Production</div>
+              <div class="miniHint">Green ≥100% • Yellow 95–99.9% • Red &lt;95% • 0 target = neutral</div>
             </div>
+            <span class="tag" id="prodTag">—</span>
+          </div>
 
-            <div class="divider"></div>
-
-            <div class="formGrid">
+          <div id="prodStatus" class="statusBox compact">
+            <div class="row2">
               <div>
-                <div class="label">Actual Maintenance hours</div>
-                <input type="number" step="0.25" min="0" id="actualMaint" placeholder="0" style="width:100%"/>
+                <div class="label">Target (M / C / T)</div>
+                <div class="mono strong" id="dailyTargetsLine">—</div>
               </div>
               <div>
-                <div class="label">Actual Construction hours</div>
-                <input type="number" step="0.25" min="0" id="actualConst" placeholder="0" style="width:100%"/>
+                <div class="label">Actual (M / C / T)</div>
+                <div class="mono strong" id="dailyActualsLine">—</div>
               </div>
             </div>
 
-            <div class="divider"></div>
-
-            <div class="controls" style="justify-content:space-between;">
-              <div class="hint">Test mode: saved locally on this device</div>
-              <button class="btn" id="btnSaveDay">Save day</button>
+            <div class="miniMeta">
+              <span>Δ% <strong class="mono" id="deltaPct">—</strong></span>
+              <span>Source <strong class="mono" id="targetSource">—</strong></span>
             </div>
-
           </div>
         </div>
-      </div>
 
-      <!-- Tickets -->
-      <div class="card">
-        <div class="cardHeader">
-          <h2>Work Tickets Missed</h2>
-          <div class="hint">Green 0 • Red 1+</div>
-        </div>
-        <div class="cardBody">
-          <div id="ticketsStatus" class="statusBox">
-            <div class="kpiBig">
-              <div class="label">Missed tickets (selected day)</div>
+        <div class="miniCard">
+          <div class="miniHeader">
+            <div>
+              <div class="miniTitle">Work Tickets Missed</div>
+              <div class="miniHint">Green 0 • Red 1+</div>
+            </div>
+            <span class="tag" id="ticketsTag">—</span>
+          </div>
+
+          <div id="ticketsStatus" class="statusBox compact">
+            <div class="kpiRow">
               <div class="value mono" id="ticketsValue">—</div>
+              <div class="label">missed</div>
             </div>
-            <div class="divider"></div>
-            <input type="number" step="1" min="0" id="ticketsInput" placeholder="0" style="width:100%"/>
+          </div>
+        </div>
+
+        <div class="miniCard">
+          <div class="miniHeader">
+            <div>
+              <div class="miniTitle">Safety Incidents</div>
+              <div class="miniHint">Green 0 • Red 1+</div>
+            </div>
+            <span class="tag" id="safetyTag">—</span>
+          </div>
+
+          <div id="safetyStatus" class="statusBox compact">
+            <div class="kpiRow">
+              <div class="value mono" id="safetyValue">—</div>
+              <div class="label">incidents</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="miniCard">
+          <div class="miniHeader">
+            <div>
+              <div class="miniTitle">Google Sheet Status</div>
+              <div class="miniHint">Read-only pull (shared)</div>
+            </div>
+            <span class="tag" id="sheetTag">—</span>
+          </div>
+
+          <div class="statusBox compact">
+            <div class="miniMeta">
+              <span>Rows loaded <strong class="mono" id="rowsLoaded">—</strong></span>
+              <span>Last fetch <strong class="mono" id="lastFetch">—</strong></span>
+            </div>
+            <div class="miniHint" style="margin-top:8px">
+              Edit the sheet to amend a day, then hit <strong>Refresh</strong>.
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Safety -->
-      <div class="card">
-        <div class="cardHeader">
-          <h2>Safety Incidents</h2>
-          <div class="hint">Green 0 • Red 1+</div>
-        </div>
-        <div class="cardBody">
-          <div id="safetyStatus" class="statusBox">
-            <div class="kpiBig">
-              <div class="label">Incidents (selected day)</div>
-              <div class="value mono" id="safetyValue">—</div>
+      <!-- Right: Daily Log -->
+      <div class="rightLog">
+        <div class="card">
+          <div class="cardHeader">
+            <div>
+              <h2>Daily Log (Selected Month)</h2>
+              <div class="hint">Click a row to jump to that date</div>
             </div>
-            <div class="divider"></div>
-            <input type="number" step="1" min="0" id="safetyInput" placeholder="0" style="width:100%"/>
+            <div class="controls">
+              <button class="btn secondary" id="btnExportMonth">Export Month CSV</button>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="tableWrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th class="mono">Target M</th>
+                    <th class="mono">Target C</th>
+                    <th class="mono">Target T</th>
+                    <th class="mono">Actual M</th>
+                    <th class="mono">Actual C</th>
+                    <th class="mono">Actual T</th>
+                    <th class="mono">Δ%</th>
+                    <th class="mono">Missed</th>
+                    <th class="mono">Safety</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="monthTbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="gridMid">
-      <!-- MTD -->
+    <!-- SECOND ROW: MTD / YTD / Monthly Summary together -->
+    <div class="summaryRow">
       <div class="card">
         <div class="cardHeader">
           <div>
-            <h2>Month-to-Date (MTD)</h2>
-            <div class="hint">Toggle drives headline + status</div>
+            <h2>MTD</h2>
+            <div class="hint">Jan 1 month start → selected day</div>
           </div>
-          <select id="kpiView">
-            <option value="total">View: Total</option>
-            <option value="maint">View: Maintenance</option>
-            <option value="const">View: Construction</option>
-          </select>
         </div>
         <div class="cardBody">
           <div id="mtdStatus" class="statusBox">
             <div class="kpiBig">
-              <div class="label">MTD actual vs target (through selected day)</div>
+              <div class="label">Actual vs Target</div>
               <div class="value mono" id="mtdHeadline">—</div>
               <div class="meta">
-                <span>Target: <strong class="mono" id="mtdTarget">—</strong></span>
-                <span>Actual: <strong class="mono" id="mtdActual">—</strong></span>
-                <span>Var: <strong class="mono" id="mtdVar">—</strong></span>
-                <span>%: <strong class="mono" id="mtdPct">—</strong></span>
+                <span>Target <strong class="mono" id="mtdTarget">—</strong></span>
+                <span>Actual <strong class="mono" id="mtdActual">—</strong></span>
+                <span>Var <strong class="mono" id="mtdVar">—</strong></span>
+                <span>% <strong class="mono" id="mtdPct">—</strong></span>
               </div>
               <div class="meta">
-                <span>Maint: <strong class="mono" id="mtdMaintLine">—</strong></span>
-                <span>Const: <strong class="mono" id="mtdConstLine">—</strong></span>
+                <span>Maint <strong class="mono" id="mtdMaintLine">—</strong></span>
+                <span>Const <strong class="mono" id="mtdConstLine">—</strong></span>
               </div>
             </div>
             <div class="divider"></div>
@@ -157,29 +200,27 @@
         </div>
       </div>
 
-      <!-- YTD -->
       <div class="card">
         <div class="cardHeader">
           <div>
-            <h2>Year-to-Date (YTD)</h2>
-            <div class="hint">Same toggle applies</div>
+            <h2>YTD</h2>
+            <div class="hint">Jan 1 → selected day</div>
           </div>
-          <span class="pill">Calendar-driven preferred</span>
         </div>
         <div class="cardBody">
           <div id="ytdStatus" class="statusBox">
             <div class="kpiBig">
-              <div class="label">YTD actual vs target (Jan 1 → selected day)</div>
+              <div class="label">Actual vs Target</div>
               <div class="value mono" id="ytdHeadline">—</div>
               <div class="meta">
-                <span>Target: <strong class="mono" id="ytdTarget">—</strong></span>
-                <span>Actual: <strong class="mono" id="ytdActual">—</strong></span>
-                <span>Var: <strong class="mono" id="ytdVar">—</strong></span>
-                <span>%: <strong class="mono" id="ytdPct">—</strong></span>
+                <span>Target <strong class="mono" id="ytdTarget">—</strong></span>
+                <span>Actual <strong class="mono" id="ytdActual">—</strong></span>
+                <span>Var <strong class="mono" id="ytdVar">—</strong></span>
+                <span>% <strong class="mono" id="ytdPct">—</strong></span>
               </div>
               <div class="meta">
-                <span>Maint: <strong class="mono" id="ytdMaintLine">—</strong></span>
-                <span>Const: <strong class="mono" id="ytdConstLine">—</strong></span>
+                <span>Maint <strong class="mono" id="ytdMaintLine">—</strong></span>
+                <span>Const <strong class="mono" id="ytdConstLine">—</strong></span>
               </div>
             </div>
             <div class="divider"></div>
@@ -187,23 +228,19 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="gridBottom">
-      <!-- Monthly Summary -->
       <div class="card">
         <div class="cardHeader">
           <div>
-            <h2>Monthly Summary (Selected Month)</h2>
-            <div class="hint">Actual vs Target by division + total</div>
+            <h2>Monthly Summary</h2>
+            <div class="hint">Whole selected month</div>
           </div>
-          <button class="btn secondary" id="btnJumpMonthStart">Month Start</button>
         </div>
         <div class="cardBody">
           <div class="statusBox" id="monthSummaryBox">
             <div class="meta">
               <span class="tag" id="monthSummaryTag">—</span>
-              <span>Fallback month target: <strong class="mono" id="monthFallbackTarget">—</strong></span>
+              <span>Fallback month target <strong class="mono" id="monthFallbackTarget">—</strong></span>
             </div>
             <div class="divider"></div>
 
@@ -246,124 +283,24 @@
 
             <div class="divider"></div>
             <div class="hint">
-              Targets use calendar sums if calendar is available; otherwise monthly-average fallback.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Daily Log -->
-      <div class="card">
-        <div class="cardHeader">
-          <div>
-            <h2>Daily Log (Selected Month)</h2>
-            <div class="hint">Click a row to jump to that date</div>
-          </div>
-          <button class="btn secondary" id="btnExportMonth">Export Month CSV</button>
-        </div>
-        <div class="cardBody">
-          <div class="tableWrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th class="mono">Target M</th>
-                  <th class="mono">Target C</th>
-                  <th class="mono">Target T</th>
-                  <th class="mono">Actual M</th>
-                  <th class="mono">Actual C</th>
-                  <th class="mono">Actual T</th>
-                  <th class="mono">Δ%</th>
-                  <th class="mono">Missed</th>
-                  <th class="mono">Safety</th>
-                </tr>
-              </thead>
-              <tbody id="monthTbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Data (auto-load + manual override) -->
-    <div style="margin-top:14px;">
-      <div class="card">
-        <div class="cardHeader">
-          <h2>Data Sources</h2>
-          <div class="hint">Auto-loads from repo /data; you can override via upload for testing</div>
-        </div>
-        <div class="cardBody">
-          <div class="controls" style="justify-content:space-between; align-items:flex-start;">
-            <div style="display:flex; flex-direction:column; gap:12px;">
-              <div class="controls">
-                <button class="btn secondary" id="btnLoadCalendar">Load ../data/calendar.csv</button>
-                <input type="file" id="calendarFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"/>
-                <button class="btn secondary" id="btnClearCalendar">Clear calendar</button>
-              </div>
-              <div class="hint">Calendar headers expected: <span class="mono">Date, MaintenanceHours, ConstructionHours</span></div>
-
-              <div class="controls">
-                <button class="btn secondary" id="btnLoadTargets">Load ../data/targets.csv</button>
-                <input type="file" id="targetsFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"/>
-                <button class="btn secondary" id="btnClearTargets">Clear targets</button>
-              </div>
-              <div class="hint">Targets headers expected: <span class="mono">Month, Construction Hours, Maintenance Hours</span> (fallback)</div>
-            </div>
-
-            <div class="meta">
-              <span>Month maint: <strong class="mono" id="monthTargetMaint">—</strong></span>
-              <span>Month const: <strong class="mono" id="monthTargetConst">—</strong></span>
-              <span>Month total: <strong class="mono" id="monthTargetTotal">—</strong></span>
-            </div>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="controls" style="justify-content:space-between;">
-            <div class="hint">Local test data tools</div>
-            <div class="controls">
-              <button class="btn secondary" id="btnExportLocal">Export local JSON</button>
-              <button class="btn danger" id="btnResetAll">Reset ALL local data</button>
+              Targets use calendar sums if available; otherwise monthly-average fallback.
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Operations Issues -->
+    <!-- (Optional) data debug -->
     <div style="margin-top:14px;">
       <div class="card">
         <div class="cardHeader">
-          <div>
-            <h2>Operations Issues (Aspire Export)</h2>
-            <div class="hint">Import CSV export (recommended). XLSX parsing can be added later.</div>
-          </div>
-          <div class="controls">
-            <input type="file" id="issuesFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"/>
-            <button class="btn secondary" id="btnClearIssues">Clear issues</button>
-          </div>
+          <h2>Targets Files</h2>
+          <div class="hint">Loaded from repo /data</div>
         </div>
         <div class="cardBody">
-          <div class="hint" style="margin-bottom:10px;">
-            Expected columns: <span class="mono">Assigned To Contact, Date, Subject, Status, Priority, Notes</span>
-          </div>
-          <div class="tableWrap" style="max-height:420px;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Assigned To</th>
-                  <th class="mono">Date</th>
-                  <th>Subject</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody id="issuesTbody">
-                <tr><td colspan="6" class="hint">No issues loaded.</td></tr>
-              </tbody>
-            </table>
+          <div class="meta">
+            <span>Calendar <strong class="mono" id="calendarDebug">—</strong></span>
+            <span>Targets <strong class="mono" id="targetsDebug">—</strong></span>
           </div>
         </div>
       </div>
