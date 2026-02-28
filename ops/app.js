@@ -164,31 +164,25 @@ function parseTargets(text){
   return out;
 }
 
+/* DayType handling for fallback proration */
 function isWorkdayByDayType(dayType){
   const dt = String(dayType || "").trim().toLowerCase();
-  // customize as you like:
-  // treat "stat"/"holiday"/"off" as non-workday for proration
-  if(!dt) return null; // unknown
+  if(!dt) return null;
   if(["stat","holiday","off","closed"].includes(dt)) return false;
-  // weekday/weekend are both "work-eligible" in your world
   if(["weekday","weekend","overtime"].includes(dt)) return true;
   return null;
 }
-
 function isWeekday(d){
   const day=d.getDay();
   return day!==0 && day!==6;
 }
-
-function countWorkdaysInRange(startYmd, endYmd){
+function countWorkdaysInRangeUsingLog(startYmd, endYmd){
   let c=0;
   for(let d=new Date(startYmd+"T00:00:00"); d<=new Date(endYmd+"T00:00:00"); d.setDate(d.getDate()+1)){
     const key = ymd(d);
-    const rec = daily[key];
-    const byType = isWorkdayByDayType(rec?.dayType);
+    const byType = isWorkdayByDayType(daily[key]?.dayType);
     if(byType === true) { c++; continue; }
     if(byType === false) { continue; }
-    // fallback if DayType unknown
     if(isWeekday(d)) c++;
   }
   return c;
@@ -199,12 +193,8 @@ function computeFallbackDailyTargets(selYmd){
   const mk=monthKeyFromDate(d);
   const t=targets[mk] || {maintenanceMonthly:0, constructionMonthly:0};
 
-  const wd = (() => {
-    // If daily log has DayType populated for the month, use that for workday count
-    const { start, end } = monthStartEnd(selYmd);
-    const c = countWorkdaysInRange(start, end);
-    return c > 0 ? c : 0;
-  })();
+  const { start, end } = monthStartEnd(selYmd);
+  const wd = countWorkdaysInRangeUsingLog(start, end) || 0;
 
   const dailyMaint = wd>0 ? safeNum(t.maintenanceMonthly)/wd : 0;
   const dailyConst = wd>0 ? safeNum(t.constructionMonthly)/wd : 0;
@@ -259,7 +249,6 @@ function getCalendarTargetForDate(dateKey){
   const cons  = safeNum(r.constTarget);
   return { maint, cons, total: maint + cons, has: true };
 }
-
 function sumCalendarTargetsByDivision(startYmd, endYmd){
   let maint = 0, cons = 0;
   for (const [k, r] of Object.entries(calendar)){
@@ -270,12 +259,18 @@ function sumCalendarTargetsByDivision(startYmd, endYmd){
   return { maint, cons, total: maint + cons };
 }
 
-/* ---------------- daily log from Google ---------------- */
-let daily = {}; // daily[YYYY-MM-DD] = { actualMaint, actualConst, ticketsMissed, safetyIncidents, notes, dayType, targetMaint, targetConst }
+/* ---------------- daily log from Google (headers exactly match yours) ---------------- */
+let daily = {}; // daily[YYYY-MM-DD] = { ... }
 let sheetLoadedCount = 0;
 
 function getDayRec(dateKey){
-  return daily[dateKey] || { actualMaint:"", actualConst:"", ticketsMissed:"", safetyIncidents:"", notes:"", dayType:"", targetMaint:"", targetConst:"" };
+  return daily[dateKey] || {
+    date: dateKey, dayType:"",
+    targetMaint:"", targetConst:"",
+    actualMaint:"", actualConst:"",
+    missedTickets:"", safetyIncidents:"",
+    notes:"", updatedAt:"", updatedBy:""
+  };
 }
 
 async function loadDailyFromGoogle(rangeStart, rangeEnd){
@@ -296,33 +291,33 @@ async function loadDailyFromGoogle(rangeStart, rangeEnd){
   const map = {};
   const rows = Array.isArray(data.rows) ? data.rows : [];
   for(const r of rows){
-    const date = String(r.Date || r.date || "").slice(0,10);
+    const date = String(r.Date || "").slice(0,10);
     if(!date.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
 
     map[date] = {
-      actualMaint: r.ActualMaint ?? r.ActualMaintHours ?? r.MaintActual ?? "",
-      actualConst: r.ActualConst ?? r.ActualConstHours ?? r.ConstActual ?? "",
-      ticketsMissed: r.MissedTickets ?? r.TicketsMissed ?? r.Missed ?? "",
-      safetyIncidents: r.SafetyIncidents ?? r.Incidents ?? r.Safety ?? "",
+      date,
+      dayType: r.DayType ?? "",
+      targetMaint: r.TargetMaint ?? "",
+      targetConst: r.TargetConst ?? "",
+      actualMaint: r.ActualMaint ?? "",
+      actualConst: r.ActualConst ?? "",
+      missedTickets: r.MissedTickets ?? "",
+      safetyIncidents: r.SafetyIncidents ?? "",
       notes: r.Notes ?? "",
-      dayType: r.DayType ?? r.Daytype ?? "",
-      // these are OPTIONAL: add them to sheet for exact targets
-      targetMaint: r.TargetMaint ?? r.TargetMaintenance ?? "",
-      targetConst: r.TargetConst ?? r.TargetConstruction ?? ""
+      updatedAt: r.UpdatedAt ?? "",
+      updatedBy: r.UpdatedBy ?? ""
     };
   }
 
   daily = map;
   sheetLoadedCount = rows.length;
-
-  el("sheetStatus").textContent = "Connected";
 }
 
 /* ---------------- targets selection logic ---------------- */
 function getDayTargets(dateKey){
   const rec = getDayRec(dateKey);
 
-  // 1) Prefer daily targets from SHEET if provided
+  // 1) Prefer daily targets from SHEET
   const sM = safeNum(rec.targetMaint);
   const sC = safeNum(rec.targetConst);
   if((sM > 0) || (sC > 0)){
@@ -341,7 +336,7 @@ function getDayTargets(dateKey){
 }
 
 function sumTargetsForRange(startYmd, endYmd){
-  // If sheet targets exist for any days in range, sum them (most accurate)
+  // If ANY sheet targets exist, sum them across days
   let hasSheetTargets = false;
   let sm=0, sc=0;
 
@@ -357,14 +352,13 @@ function sumTargetsForRange(startYmd, endYmd){
   }
   if(hasSheetTargets) return { maint:sm, cons:sc, total:sm+sc, source:"Sheet Targets" };
 
-  // Else: calendar sums if available
+  // Else calendar
   if(calendarLoaded){
     const c = sumCalendarTargetsByDivision(startYmd, endYmd);
     return { ...c, source:"Calendar" };
   }
 
-  // Else: monthly avg prorated by workdays in range
-  // We compute per-month totals based on targets.csv and prorate by counted workdays in that month/range
+  // Else fallback: sum daily prorated targets for workdays
   let maint=0, cons=0;
   for(let d=new Date(startYmd+"T00:00:00"); d<=new Date(endYmd+"T00:00:00"); d.setDate(d.getDate()+1)){
     const k = ymd(d);
@@ -396,10 +390,7 @@ function renderMonthTable(mStart, mEnd, selected){
   const tbody = el("monthTbody");
   tbody.innerHTML = "";
 
-  const start = new Date(mStart+"T00:00:00");
-  const end = new Date(mEnd+"T00:00:00");
-
-  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+  for(let d=new Date(mStart+"T00:00:00"); d<=new Date(mEnd+"T00:00:00"); d.setDate(d.getDate()+1)){
     const key = ymd(d);
     const rec = getDayRec(key);
 
@@ -412,7 +403,7 @@ function renderMonthTable(mStart, mEnd, selected){
     const tagState = tagByPct(pct);
     const deltaPct = (t.total>0) ? (((aT/t.total)-1)*100).toFixed(1)+"%" : "—";
 
-    const tickets = safeNum(rec.ticketsMissed);
+    const tickets = safeNum(rec.missedTickets);
     const safety = safeNum(rec.safetyIncidents);
 
     const tr = document.createElement("tr");
@@ -433,34 +424,40 @@ function renderMonthTable(mStart, mEnd, selected){
       <td class="mono">${fmt0(safety)}</td>
       <td>${escapeHtml(rec.notes ?? "")}</td>
     `;
+
     tr.addEventListener("click", ()=>{
       el("datePicker").value = key;
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
+
     tbody.appendChild(tr);
   }
 }
 
-/* ---------------- export ---------------- */
+/* ---------------- export month CSV ---------------- */
 function exportMonthCSV(){
   const sel = el("datePicker").value;
   const { start: mStart, end: mEnd } = monthStartEnd(sel);
 
   const rows = [];
-  rows.push(["Date","TargetMaint","TargetConst","TargetTotal","ActualMaint","ActualConst","ActualTotal","DeltaPct","MissedTickets","SafetyIncidents","Notes"]);
+  rows.push(["Date","DayType","TargetMaint","TargetConst","ActualMaint","ActualConst","MissedTickets","SafetyIncidents","Notes"]);
 
   for(let d=new Date(mStart+"T00:00:00"); d<=new Date(mEnd+"T00:00:00"); d.setDate(d.getDate()+1)){
     const key = ymd(d);
     const rec = getDayRec(key);
-    const t = getDayTargets(key);
 
-    const aM = safeNum(rec.actualMaint);
-    const aC = safeNum(rec.actualConst);
-    const aT = aM + aC;
-    const deltaPct = t.total>0 ? (((aT/t.total)-1)*100).toFixed(1)+"%" : "";
-
-    rows.push([key, t.maint, t.cons, t.total, aM, aC, aT, deltaPct, safeNum(rec.ticketsMissed), safeNum(rec.safetyIncidents), (rec.notes ?? "")]);
+    rows.push([
+      key,
+      rec.dayType ?? "",
+      safeNum(rec.targetMaint),
+      safeNum(rec.targetConst),
+      safeNum(rec.actualMaint),
+      safeNum(rec.actualConst),
+      safeNum(rec.missedTickets),
+      safeNum(rec.safetyIncidents),
+      rec.notes ?? ""
+    ]);
   }
 
   const esc = (v)=> {
@@ -496,7 +493,7 @@ async function loadTargetsFromRepo(){
   targetsLoaded = Object.keys(targets).length > 0;
 }
 
-/* ---------------- summary range presets ---------------- */
+/* ---------------- Summary preset controls ---------------- */
 function setSummaryPreset(preset){
   const today = ymd(new Date());
   const selected = el("datePicker").value || today;
@@ -516,7 +513,6 @@ function setSummaryPreset(preset){
     start = `${d.getFullYear()}-01-01`;
     end = today;
   } else if(preset === "custom"){
-    // keep user values
     start = el("summaryStart").value || `${d.getFullYear()}-01-01`;
     end = el("summaryEnd").value || today;
   }
@@ -530,9 +526,7 @@ function setSummaryPreset(preset){
 }
 
 function getSummaryRange(){
-  const start = el("summaryStart").value;
-  const end = el("summaryEnd").value;
-  return { start, end };
+  return { start: el("summaryStart").value, end: el("summaryEnd").value };
 }
 
 /* ---------------- render ---------------- */
@@ -546,6 +540,7 @@ function render(){
   el("targetsLabel").textContent = targetsLoaded ? "Yes" : "No";
   el("calendarLabel").textContent = calendarLoaded ? "Yes" : "No";
 
+  // Daily card
   const rec = getDayRec(sel);
   el("dayTypeLabel").textContent = rec.dayType ? String(rec.dayType) : "—";
 
@@ -566,7 +561,7 @@ function render(){
   el("prodTag").className = `tag ${prodTag.cls}`;
   el("prodTag").textContent = prodTag.txt;
 
-  const tickets = safeNum(rec.ticketsMissed);
+  const tickets = safeNum(rec.missedTickets);
   const safety = safeNum(rec.safetyIncidents);
 
   el("ticketsValue").textContent = fmt0(tickets);
@@ -579,53 +574,44 @@ function render(){
   el("safetyTag").className = `tag ${safety>0 ? "bad" : "good"}`;
   el("safetyTag").textContent = safety>0 ? "Incident" : "Good";
 
-  // month table always uses selected month
+  // Month table uses selected month
   const { start: mStart, end: mEnd } = monthStartEnd(sel);
   renderMonthTable(mStart, mEnd, sel);
 
-  // summary uses summary range controls
+  // Summary uses Summary Range controls
   const { start: sStart, end: sEnd } = getSummaryRange();
   const view = el("kpiView").value;
 
   const sActual = sumActualsByDivision(sStart, sEnd);
   const sTarget = sumTargetsForRange(sStart, sEnd);
 
-  const mA = (view==="maint") ? sActual.maint : (view==="const") ? sActual.cons : sActual.total;
-  const mT = (view==="maint") ? sTarget.maint : (view==="const") ? sTarget.cons : sTarget.total;
+  const vA = (view==="maint") ? sActual.maint : (view==="const") ? sActual.cons : sActual.total;
+  const vT = (view==="maint") ? sTarget.maint : (view==="const") ? sTarget.cons : sTarget.total;
 
-  const mPct = mT>0 ? mA/mT : null;
-  const mVar = mA - mT;
+  const vPct = vT>0 ? vA/vT : null;
+  const vVar = vA - vT;
 
-  // Use the same summary values for MTD and YTD tiles (since you requested range-driven)
-  // If you want two different ranges (MTD vs YTD), we can split them later.
-  setBoxStatus(el("mtdStatus"), statusByPct(mPct));
-  el("mtdHeadline").textContent = (mT>0) ? `${fmt1(mA)} / ${fmt1(mT)} hrs` : "No target";
-  el("mtdTarget").textContent = fmt1(mT);
-  el("mtdActual").textContent = fmt1(mA);
-  el("mtdVar").textContent = (mT>0||mA>0) ? `${mVar>=0?"+":""}${mVar.toFixed(1)}` : "—";
-  el("mtdPct").textContent = (mPct!=null) ? `${(mPct*100).toFixed(1)}%` : "—";
-  el("mtdBar").style.width = `${Math.min(100, Math.max(0, (mPct||0)*100))}%`;
+  setBoxStatus(el("mtdStatus"), statusByPct(vPct));
+  el("mtdHeadline").textContent = (vT>0) ? `${fmt1(vA)} / ${fmt1(vT)} hrs` : "No target";
+  el("mtdTarget").textContent = fmt1(vT);
+  el("mtdActual").textContent = fmt1(vA);
+  el("mtdVar").textContent = (vT>0||vA>0) ? `${vVar>=0?"+":""}${vVar.toFixed(1)}` : "—";
+  el("mtdPct").textContent = (vPct!=null) ? `${(vPct*100).toFixed(1)}%` : "—";
+  el("mtdBar").style.width = `${Math.min(100, Math.max(0, (vPct||0)*100))}%`;
 
-  setBoxStatus(el("ytdStatus"), statusByPct(mPct));
-  el("ytdHeadline").textContent = (mT>0) ? `${fmt1(mA)} / ${fmt1(mT)} hrs` : "No target";
-  el("ytdTarget").textContent = fmt1(mT);
-  el("ytdActual").textContent = fmt1(mA);
-  el("ytdVar").textContent = (mT>0||mA>0) ? `${mVar>=0?"+":""}${mVar.toFixed(1)}` : "—";
-  el("ytdPct").textContent = (mPct!=null) ? `${(mPct*100).toFixed(1)}%` : "—";
-  el("ytdBar").style.width = `${Math.min(100, Math.max(0, (mPct||0)*100))}%`;
+  setBoxStatus(el("ytdStatus"), statusByPct(vPct));
+  el("ytdHeadline").textContent = (vT>0) ? `${fmt1(vA)} / ${fmt1(vT)} hrs` : "No target";
+  el("ytdTarget").textContent = fmt1(vT);
+  el("ytdActual").textContent = fmt1(vA);
+  el("ytdVar").textContent = (vT>0||vA>0) ? `${vVar>=0?"+":""}${vVar.toFixed(1)}` : "—";
+  el("ytdPct").textContent = (vPct!=null) ? `${(vPct*100).toFixed(1)}%` : "—";
+  el("ytdBar").style.width = `${Math.min(100, Math.max(0, (vPct||0)*100))}%`;
 
-  // Monthly summary tile now also uses summary range (as requested)
-  const pctMonth = mT>0 ? (mA/mT) : null;
-  const tag = tagByPct(pctMonth);
+  const tag = tagByPct(vPct);
   el("monthSummaryTag").className = `tag ${tag.cls}`;
-  el("monthSummaryTag").textContent = `${tag.txt} (${pctMonth==null ? "—" : (pctMonth*100).toFixed(1)+"%"})`;
-  setBoxStatus(el("monthSummaryBox"), statusByPct(pctMonth));
+  el("monthSummaryTag").textContent = `${tag.txt} (${vPct==null ? "—" : (vPct*100).toFixed(1)+"%"})`;
+  setBoxStatus(el("monthSummaryBox"), statusByPct(vPct));
 
-  // fallback month target display (still useful)
-  const fb = computeFallbackDailyTargets(sel);
-  el("monthFallbackTarget").textContent = fmt1(fb.monthMaint + fb.monthConst);
-
-  // Fill the summary table using the summary range
   const fill = (tId, aId, vId, pId, tVal, aVal) => {
     el(tId).textContent = fmt1(tVal);
     el(aId).textContent = fmt1(aVal);
@@ -634,7 +620,6 @@ function render(){
     const p = tVal>0 ? (aVal/tVal) : null;
     el(pId).textContent = p==null ? "—" : `${(p*100).toFixed(1)}%`;
   };
-
   fill("msTMaint","msAMaint","msVMaint","msPMaint", sTarget.maint, sActual.maint);
   fill("msTConst","msAConst","msVConst","msPConst", sTarget.cons,  sActual.cons);
   fill("msTTotal","msATotal","msVTotal","msPTotal", sTarget.total, sActual.total);
@@ -644,10 +629,10 @@ function render(){
 async function refreshAll(){
   const sel = el("datePicker").value || ymd(new Date());
 
-  try { await loadCalendarFromRepo(); calendarLoaded = Object.keys(calendar).length>0; } catch { calendarLoaded=false; }
-  try { await loadTargetsFromRepo(); targetsLoaded = Object.keys(targets).length>0; } catch { targetsLoaded=false; }
+  try { await loadCalendarFromRepo(); } catch(e){ console.warn(e); calendarLoaded=false; }
+  try { await loadTargetsFromRepo(); } catch(e){ console.warn(e); targetsLoaded=false; }
 
-  // IMPORTANT: load the whole year so Jan shows even if you're in Feb
+  // Load full year so Jan is available even when viewing Feb
   try{
     await loadDailyFromGoogle(yearStart(sel), yearEnd(sel));
     el("sheetStatus").textContent = `Loaded (${sheetLoadedCount})`;
