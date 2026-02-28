@@ -350,13 +350,17 @@ function sumTargetsForRange(startYmd, endYmd){
   for(let d=new Date(startYmd+"T00:00:00"); d<=new Date(endYmd+"T00:00:00"); d.setDate(d.getDate()+1)){
     const k = ymd(d);
     const rec = getDayRec(k);
-    const tm = safeNum(rec.targetMaint);
-    const tc = safeNum(rec.targetConst);
-    if(tm>0 || tc>0){
+
+    const sheetHasMaint = hasValue(rec.targetMaint);
+    const sheetHasConst = hasValue(rec.targetConst);
+
+    if(sheetHasMaint || sheetHasConst){
       hasSheetTargets = true;
-      sm += tm; sc += tc;
+      sm += safeNum(rec.targetMaint);
+      sc += safeNum(rec.targetConst);
     }
   }
+
   if(hasSheetTargets) return { maint:sm, cons:sc, total:sm+sc, source:"Sheet Targets" };
 
   // Else calendar
