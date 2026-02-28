@@ -121,11 +121,19 @@ h2{
 }
 
 select{
-  background: var(--panel);
-  border: 1px solid var(--stroke);
-  color: var(--text);
+  background: rgba(0,0,0,0.85);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.92);
   padding: 8px 12px;
   border-radius: 10px;
+  outline: none;
+}
+
+/* Dropdown menu (options list) */
+select option{
+  background: #000;
+  color: rgba(255,255,255,0.92);
+}
 }
 
 input[type="checkbox"]{
