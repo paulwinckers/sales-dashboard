@@ -36,23 +36,41 @@
       </div>
     </div>
 
-    <!-- TOP: Daily Log (last 14 days, yesterday first) -->
+    <!-- TOP: Daily Log -->
     <div class="card" style="margin-top:14px;">
       <div class="cardHeader">
         <div>
-          <h2>Last 2 Weeks (Yesterday → Back)</h2>
+          <h2>Daily Log</h2>
           <div class="hint">
-            Shows the most recent 14 days ending yesterday. Edit the Google Sheet to amend prior days, then Refresh.
+            Defaults to last 14 workdays ending yesterday. Use range to scroll further back.
           </div>
+        </div>
+
+        <div class="controls">
+          <label class="control">
+            <span>Show</span>
+            <select id="logRange">
+              <option value="14" selected>Last 14 workdays</option>
+              <option value="30">Last 30 workdays</option>
+              <option value="90">Last 90 workdays</option>
+              <option value="ytd">YTD (workdays)</option>
+            </select>
+          </label>
+
+          <label class="control" style="display:flex; align-items:center; gap:10px;">
+            <span>Include weekends/stat</span>
+            <input id="includeOffDays" type="checkbox" />
+          </label>
         </div>
       </div>
 
       <div class="cardBody">
-        <div class="tableWrap" style="max-height:560px;">
+        <div class="tableWrap" style="max-height:620px;">
           <table>
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Status</th>
                 <th>DayType</th>
                 <th class="mono">Budget M</th>
                 <th class="mono">Budget C</th>
@@ -67,13 +85,13 @@
                 <th>Notes</th>
               </tr>
             </thead>
-            <tbody id="twoWeekTbody"></tbody>
+            <tbody id="logTbody"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- SECOND: MTD + YTD (Budget vs Actual) -->
+    <!-- MTD + YTD -->
     <div class="summaryRow" style="grid-template-columns: 1fr 1fr; margin-top:14px;">
       <div class="card">
         <div class="cardHeader">
