@@ -17,174 +17,78 @@
   <div class="wrap">
     <div class="header">
       <div>
-        <h1>Daily Operations Scoreboard</h1>
+        <h1>Operations Daily Log</h1>
         <div class="sub">
-          <span class="pill">Selected day: <strong id="displayDate">—</strong></span>
-          <span class="pill">Month: <strong id="monthLabel">—</strong></span>
-          <span class="pill">Sheet: <strong id="sheetStatus">Loading…</strong></span>
+          <span class="pill">As of: <strong id="asOfLabel">—</strong> (yesterday)</span>
+          <span class="pill">Google Sheet: <strong id="sheetStatus">Loading…</strong></span>
           <span class="pill">Targets: <strong id="targetsLabel">Loading…</strong></span>
           <span class="pill">Calendar: <strong id="calendarLabel">Loading…</strong></span>
         </div>
       </div>
 
       <div class="controls">
-        <button class="btn secondary" id="btnPrevDay">◀</button>
-        <input type="date" id="datePicker"/>
-        <button class="btn secondary" id="btnNextDay">▶</button>
-        <button class="btn secondary" id="btnMonthStart">Month Start</button>
+        <select id="kpiView">
+          <option value="total">View: Total</option>
+          <option value="maint">View: Maintenance</option>
+          <option value="const">View: Construction</option>
+        </select>
         <button class="btn" id="btnRefresh">Refresh</button>
       </div>
     </div>
 
-    <div class="topLayout">
-      <div class="leftScoreboard">
-        <div class="miniCard">
-          <div class="miniHeader">
-            <div>
-              <div class="miniTitle">Daily Production</div>
-              <div class="miniHint">Green ≥100% • Yellow 95–99.9% • Red &lt;95% • 0 target = neutral</div>
-            </div>
-            <span class="tag" id="prodTag">—</span>
-          </div>
-
-          <div id="prodStatus" class="statusBox compact">
-            <div class="row2">
-              <div>
-                <div class="label">Target (M / C / T)</div>
-                <div class="mono strong" id="dailyTargetsLine">—</div>
-              </div>
-              <div>
-                <div class="label">Actual (M / C / T)</div>
-                <div class="mono strong" id="dailyActualsLine">—</div>
-              </div>
-            </div>
-
-            <div class="miniMeta">
-              <span>Δ% <strong class="mono" id="deltaPct">—</strong></span>
-              <span>Source <strong class="mono" id="targetSource">—</strong></span>
-              <span>DayType <strong class="mono" id="dayTypeLabel">—</strong></span>
-            </div>
-          </div>
-        </div>
-
-        <div class="miniCard">
-          <div class="miniHeader">
-            <div>
-              <div class="miniTitle">Work Tickets Missed</div>
-              <div class="miniHint">Green 0 • Red 1+</div>
-            </div>
-            <span class="tag" id="ticketsTag">—</span>
-          </div>
-
-          <div id="ticketsStatus" class="statusBox compact">
-            <div class="kpiRow">
-              <div class="value mono" id="ticketsValue">—</div>
-              <div class="label">missed</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="miniCard">
-          <div class="miniHeader">
-            <div>
-              <div class="miniTitle">Safety Incidents</div>
-              <div class="miniHint">Green 0 • Red 1+</div>
-            </div>
-            <span class="tag" id="safetyTag">—</span>
-          </div>
-
-          <div id="safetyStatus" class="statusBox compact">
-            <div class="kpiRow">
-              <div class="value mono" id="safetyValue">—</div>
-              <div class="label">incidents</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="rightLog">
-        <div class="card">
-          <div class="cardHeader">
-            <div>
-              <h2>Daily Log (Selected Month)</h2>
-              <div class="hint">Click a row to jump to that date</div>
-            </div>
-            <div class="controls">
-              <button class="btn secondary" id="btnExportMonth">Export Month CSV</button>
-            </div>
-          </div>
-
-          <div class="cardBody">
-            <div class="tableWrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th class="mono">Target M</th>
-                    <th class="mono">Target C</th>
-                    <th class="mono">Target T</th>
-                    <th class="mono">Actual M</th>
-                    <th class="mono">Actual C</th>
-                    <th class="mono">Actual T</th>
-                    <th class="mono">Δ%</th>
-                    <th class="mono">Missed</th>
-                    <th class="mono">Safety</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody id="monthTbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SUMMARY RANGE CONTROLS -->
+    <!-- TOP: Daily Log (last 14 days, yesterday first) -->
     <div class="card" style="margin-top:14px;">
       <div class="cardHeader">
         <div>
-          <h2>Summary Range</h2>
-          <div class="hint">Controls MTD / YTD / Monthly Summary calculations</div>
-        </div>
-        <div class="controls">
-          <select id="summaryPreset">
-            <option value="thisMonth">This Month (to today)</option>
-            <option value="lastMonth">Last Month</option>
-            <option value="thisYear">This Year (to today)</option>
-            <option value="custom">Custom</option>
-          </select>
-          <input type="date" id="summaryStart" />
-          <input type="date" id="summaryEnd" />
-          <select id="kpiView">
-            <option value="total">View: Total</option>
-            <option value="maint">View: Maintenance</option>
-            <option value="const">View: Construction</option>
-          </select>
+          <h2>Last 2 Weeks (Yesterday → Back)</h2>
+          <div class="hint">
+            Shows the most recent 14 days ending yesterday. Edit the Google Sheet to amend prior days, then Refresh.
+          </div>
         </div>
       </div>
+
       <div class="cardBody">
-        <div class="hint">
-          Targets are prorated using <strong>DayType</strong> if daily targets are not provided.
-          Best practice: add <span class="mono">TargetMaint</span> and <span class="mono">TargetConst</span> to the sheet.
+        <div class="tableWrap" style="max-height:560px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>DayType</th>
+                <th class="mono">Budget M</th>
+                <th class="mono">Budget C</th>
+                <th class="mono">Budget T</th>
+                <th class="mono">Actual M</th>
+                <th class="mono">Actual C</th>
+                <th class="mono">Actual T</th>
+                <th class="mono">Δ (hrs)</th>
+                <th class="mono">Δ%</th>
+                <th class="mono">Missed</th>
+                <th class="mono">Safety</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="twoWeekTbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <div class="summaryRow">
+    <!-- SECOND: MTD + YTD (Budget vs Actual) -->
+    <div class="summaryRow" style="grid-template-columns: 1fr 1fr; margin-top:14px;">
       <div class="card">
         <div class="cardHeader">
-          <h2>MTD</h2>
-          <div class="hint">Uses Summary Range</div>
+          <div>
+            <h2>MTD (Budget vs Actual)</h2>
+            <div class="hint">Month start → yesterday</div>
+          </div>
         </div>
         <div class="cardBody">
           <div id="mtdStatus" class="statusBox">
             <div class="kpiBig">
-              <div class="label">Actual vs Target</div>
+              <div class="label">Actual vs Budget</div>
               <div class="value mono" id="mtdHeadline">—</div>
               <div class="meta">
-                <span>Target <strong class="mono" id="mtdTarget">—</strong></span>
+                <span>Budget <strong class="mono" id="mtdBudget">—</strong></span>
                 <span>Actual <strong class="mono" id="mtdActual">—</strong></span>
                 <span>Var <strong class="mono" id="mtdVar">—</strong></span>
                 <span>% <strong class="mono" id="mtdPct">—</strong></span>
@@ -202,16 +106,18 @@
 
       <div class="card">
         <div class="cardHeader">
-          <h2>YTD</h2>
-          <div class="hint">Uses Summary Range</div>
+          <div>
+            <h2>YTD (Budget vs Actual)</h2>
+            <div class="hint">Jan 1 → yesterday</div>
+          </div>
         </div>
         <div class="cardBody">
           <div id="ytdStatus" class="statusBox">
             <div class="kpiBig">
-              <div class="label">Actual vs Target</div>
+              <div class="label">Actual vs Budget</div>
               <div class="value mono" id="ytdHeadline">—</div>
               <div class="meta">
-                <span>Target <strong class="mono" id="ytdTarget">—</strong></span>
+                <span>Budget <strong class="mono" id="ytdBudget">—</strong></span>
                 <span>Actual <strong class="mono" id="ytdActual">—</strong></span>
                 <span>Var <strong class="mono" id="ytdVar">—</strong></span>
                 <span>% <strong class="mono" id="ytdPct">—</strong></span>
@@ -223,65 +129,6 @@
             </div>
             <div class="divider"></div>
             <div class="bar"><div id="ytdBar"></div></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="cardHeader">
-          <h2>Monthly Summary</h2>
-          <div class="hint">Uses Summary Range</div>
-        </div>
-        <div class="cardBody">
-          <div class="statusBox" id="monthSummaryBox">
-            <div class="meta">
-              <span class="tag" id="monthSummaryTag">—</span>
-              <span>Fallback month target <strong class="mono" id="monthFallbackTarget">—</strong></span>
-            </div>
-            <div class="divider"></div>
-
-            <div class="tableWrap" style="max-height:260px;">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Division</th>
-                    <th class="mono">Target</th>
-                    <th class="mono">Actual</th>
-                    <th class="mono">Var</th>
-                    <th class="mono">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Maintenance</td>
-                    <td class="mono" id="msTMaint">—</td>
-                    <td class="mono" id="msAMaint">—</td>
-                    <td class="mono" id="msVMaint">—</td>
-                    <td class="mono" id="msPMaint">—</td>
-                  </tr>
-                  <tr>
-                    <td>Construction</td>
-                    <td class="mono" id="msTConst">—</td>
-                    <td class="mono" id="msAConst">—</td>
-                    <td class="mono" id="msVConst">—</td>
-                    <td class="mono" id="msPConst">—</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Total</strong></td>
-                    <td class="mono" id="msTTotal">—</td>
-                    <td class="mono" id="msATotal">—</td>
-                    <td class="mono" id="msVTotal">—</td>
-                    <td class="mono" id="msPTotal">—</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div class="divider"></div>
-            <div class="hint">
-              If you add <span class="mono">TargetMaint</span> / <span class="mono">TargetConst</span> to the sheet,
-              targets will be exact (including weekends/OT).
-            </div>
           </div>
         </div>
       </div>
