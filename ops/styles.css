@@ -28,9 +28,9 @@ body{
 }
 
 .wrap{
-  max-width:1600px;
-  margin:22px auto 28px;
-  padding:0 18px;
+  max-width: 1700px;
+  margin: 18px auto 28px;
+  padding: 0 18px;
 }
 
 /* Toggle nav */
@@ -55,7 +55,6 @@ body{
   background: rgba(3,5,12,.55);
   font-size: 13px;
 }
-
 .dash-nav a:hover{ border-color: rgba(55,233,255,.55); }
 .dash-nav a.active{
   border-color: rgba(24,240,139,.55);
@@ -68,7 +67,7 @@ body{
   justify-content:space-between;
   gap:14px;
   flex-wrap:wrap;
-  padding:18px 18px 14px;
+  padding:16px 16px 12px;
   border:1px solid var(--border);
   border-radius:var(--radius);
   background: linear-gradient(180deg, rgba(11,16,32,.84), rgba(7,10,20,.78));
@@ -90,7 +89,7 @@ body{
 
 h1{
   margin:0;
-  font-size:28px;
+  font-size:26px;
   letter-spacing:.4px;
   text-shadow: 0 0 22px rgba(55,233,255,.18);
 }
@@ -145,37 +144,45 @@ button:hover{
 .btn.secondary{ border-color: rgba(155,176,209,.22); }
 .btn.danger{ border-color: rgba(255,77,109,.40); }
 
-.gridTop{
-  margin-top:16px;
-  display:grid;
-  grid-template-columns:2fr 1fr 1fr;
-  gap:14px;
+/* Layout */
+.topLayout{
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 14px;
+  align-items: start;
 }
-.gridMid{
-  margin-top:14px;
-  display:grid;
-  grid-template-columns:1.25fr 1.75fr;
-  gap:14px;
-}
-.gridBottom{
-  margin-top:14px;
-  display:grid;
-  grid-template-columns:1.2fr 1.8fr;
-  gap:14px;
-}
-@media (max-width:1200px){
-  .gridTop,.gridMid,.gridBottom{ grid-template-columns:1fr; }
+@media (max-width: 1200px){
+  .topLayout{ grid-template-columns: 1fr; }
 }
 
-.card{
+.leftScoreboard{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.summaryRow{
+  margin-top: 14px;
+  display:grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap:14px;
+}
+@media (max-width: 1200px){
+  .summaryRow{ grid-template-columns: 1fr; }
+}
+
+/* Cards */
+.card, .miniCard{
   border:1px solid var(--border);
   border-radius:var(--radius);
   background: linear-gradient(180deg, rgba(11,16,32,.76), rgba(7,10,20,.74));
   box-shadow:var(--shadow);
   overflow:hidden;
 }
+
 .cardHeader{
-  padding:14px 16px;
+  padding:12px 14px;
   display:flex;
   justify-content:space-between;
   align-items:center;
@@ -185,17 +192,29 @@ button:hover{
 }
 .cardHeader h2{ margin:0; font-size:15px; letter-spacing:.3px; }
 .hint{ color:var(--muted); font-size:12px; }
-.cardBody{ padding:14px 16px 16px; }
+.cardBody{ padding:12px 14px 14px; }
 
+.miniHeader{
+  padding: 12px 14px 10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  border-bottom:1px solid rgba(55,233,255,.12);
+}
+.miniTitle{ font-size:14px; font-weight:700; margin-bottom:2px; }
+.miniHint{ color:var(--muted); font-size:11.5px; line-height:1.2; }
+
+/* Status boxes */
 .statusBox{
   border-radius:16px;
-  padding:14px;
+  padding:12px;
   border:1px solid rgba(155,176,209,.18);
   background: rgba(3,5,12,.50);
   box-shadow: inset 0 0 34px rgba(0,0,0,.30);
 }
+.statusBox.compact{ padding:10px; }
 
-/* More pronounced status colors */
 .statusBox.good{
   border-color: rgba(24,240,139,.75);
   background: linear-gradient(180deg, rgba(24,240,139,.25), rgba(3,5,12,.55));
@@ -214,7 +233,14 @@ button:hover{
 
 .kpiBig{ display:flex; flex-direction:column; gap:8px; }
 .label{ color:var(--muted); font-size:12px; }
-.value{ font-size:36px; font-weight:800; letter-spacing:.6px; }
+.value{ font-size:32px; font-weight:850; letter-spacing:.6px; }
+
+.mono{
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.strong{ font-weight:800; font-size:14px; }
 
 .meta{
   display:flex;
@@ -230,22 +256,41 @@ button:hover{
   background: rgba(3,5,12,.44);
 }
 
-.formGrid{
+.miniMeta{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  color:var(--muted);
+  font-size:12px;
+  margin-top:10px;
+}
+.miniMeta span{
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(155,176,209,.18);
+  background: rgba(3,5,12,.44);
+}
+
+.row2{
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 520px){
+  .row2{ grid-template-columns: 1fr; }
+}
+
+.kpiRow{
+  display:flex;
+  align-items:baseline;
   gap:10px;
 }
-@media (max-width:700px){ .formGrid{ grid-template-columns:1fr; } }
+.kpiRow .value{ font-size:40px; line-height:1; }
 
 .divider{
   height:1px;
   background: rgba(55,233,255,.10);
   margin:12px 0;
-}
-
-.mono{
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
 }
 
 .bar{
@@ -282,7 +327,7 @@ th{
   border-bottom:1px solid rgba(55,233,255,.18);
 }
 .tableWrap{
-  max-height:520px;
+  max-height: 560px;
   overflow:auto;
   border:1px solid rgba(55,233,255,.12);
   border-radius:14px;
