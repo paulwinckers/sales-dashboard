@@ -27,11 +27,14 @@
       </div>
 
       <div class="controls">
-        <select id="kpiView">
-          <option value="total">View: Total</option>
-          <option value="maint">View: Maintenance</option>
-          <option value="const">View: Construction</option>
-        </select>
+       <label class="control">
+      <span>Division</span>
+      <select id="kpiView">
+        <option value="total">Total</option>
+        <option value="maint">Maintenance</option>
+        <option value="const">Construction</option>
+      </select>
+    </label>
         <button class="btn" id="btnRefresh">Refresh</button>
       </div>
     </div>
@@ -50,7 +53,7 @@
           <label class="control">
             <span>Show</span>
             <select id="logRange">
-              <option value="14" selected>Last 14 workdays</option>
+              <option value="5" selected>Last 5 workdays</option>
               <option value="30">Last 30 workdays</option>
               <option value="90">Last 90 workdays</option>
               <option value="ytd">YTD (workdays)</option>
