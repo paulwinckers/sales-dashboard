@@ -1,5 +1,5 @@
 const CONFIG = {
-  SHEET_API_URL: "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE", // ends with /exec
+  SHEET_API_URL: "https://script.google.com/macros/s/AKfycbxemOcHaO8jJL2JNvr6G3INrHOSahH3-1QYcsrb5IV19DG77lPUPtDkco_s9r8RFwmI/exec", // ends with /exec
   API_KEY: "",
   SHEET_TAB_NAME: "OpsDailyLog",
   CALENDAR_URL: "../data/calendar.csv",
