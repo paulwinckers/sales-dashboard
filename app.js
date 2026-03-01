@@ -320,27 +320,52 @@ async function loadWorkTickets(url) {
 async function loadSalesActMonthly(baseUrl, monthKeys) {
   const out = {};
   for (const mk of monthKeys) {
-    out[mk] = { constrRevMTD: 0, maintRevMTD: 0, constrHrsMTD: 0, maintHrsMTD: 0, updatedAt: "", updatedBy: "" };
+    out[mk] = {
+      constrRevMTD: 0,
+      maintRevMTD: 0,
+      constrHrsMTD: 0,
+      maintHrsMTD: 0,
+      updatedAt: "",
+      updatedBy: ""
+    };
   }
 
-  const url = `${baseUrl}?tab=SalesAct`;
+  const url = `${baseUrl}?tab=SalesAct&_=${Date.now()}`; // cache-bust
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`SalesAct HTTP ${res.status}`);
+  const raw = await res.text();
 
-  const payload = await res.json();
-  const rows = payload?.rows || payload?.data || payload || [];
-  const arr = Array.isArray(rows) ? rows : (rows.rows || []);
+  // If the web app isn't public / returns an interstitial, you'll get HTML
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.includes("<body")) {
+    throw new Error(
+      "SalesAct endpoint returned HTML (not JSON). " +
+      "Re-deploy the Apps Script Web App with access = Anyone (or Anyone with link)."
+    );
+  }
 
-  for (const r of arr) {
+  let payload;
+  try {
+    payload = JSON.parse(trimmed);
+  } catch {
+    throw new Error("SalesAct response was not valid JSON.");
+  }
+
+  if (payload?.ok === false) {
+    throw new Error(`SalesAct returned ok:false (${payload.error || "unknown error"})`);
+  }
+
+  const rows = payload?.rows || [];
+  for (const r of rows) {
     const mk = normalizeMonthKey(r.Month);
     if (!mk || !(mk in out)) continue;
 
-    out[mk].constrRevMTD = parseCurrency(r.ActualConstRevMTD);
-    out[mk].maintRevMTD = parseCurrency(r.ActualMaintRevMTD);
-    out[mk].constrHrsMTD = parseNumberLoose(r.ActualConstrHoursMTD);
-    out[mk].maintHrsMTD = parseNumberLoose(r.ActualMaintHoursMTD);
-    out[mk].updatedAt = r.UpdatedAt ? String(r.UpdatedAt) : "";
-    out[mk].updatedBy = r.UpdatedBy ? String(r.UpdatedBy) : "";
+    // EXACT header names you provided
+    out[mk].constrRevMTD  = parseCurrency(r.ActualConstRevMTD);
+    out[mk].maintRevMTD   = parseCurrency(r.ActualMaintRevMTD);
+    out[mk].constrHrsMTD  = parseNumberLoose(r.ActualConstrHoursMTD);
+    out[mk].maintHrsMTD   = parseNumberLoose(r.ActualMaintHoursMTD);
+    out[mk].updatedAt     = r.UpdatedAt ? String(r.UpdatedAt) : "";
+    out[mk].updatedBy     = r.UpdatedBy ? String(r.UpdatedBy) : "";
   }
 
   return out;
@@ -828,6 +853,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
