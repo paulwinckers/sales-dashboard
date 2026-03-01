@@ -3,148 +3,295 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sales & Ops Dashboard</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <div class="dash-nav">
-  <a class="active" href="./">Sales</a>
-  <a href="./ops/">Ops</a>
-</div>
-  <header class="header">
-    <div>
-      <h1>Sales & Ops Dashboard</h1>
-      <div class="sub">
-        Data from <code>/data</code> folder • Last refresh: <span id="lastRefresh">—</span>
-      </div>
-    </div>
-
-    <div class="controls">
-      <label class="control">
-        <span>View</span>
-        <select id="viewToggle">
-          <option value="all">All</option>
-          <option value="construction">Construction</option>
-          <option value="maintenance">Maintenance</option>
-        </select>
-      </label>
-
-      <label class="control">
-        <span>Month</span>
-        <select id="asOfMonth"></select>
-      </label>
-
-      <button id="refreshBtn" class="btn">Refresh</button>
-    </div>
-  </header>
-
-  <section class="panel">
-    <h2>KPI Charts</h2>
-
-    <div class="charts">
-      <div class="chartCard">
-        <h3>Revenue Target vs Pipeline (Year)</h3>
-        <canvas id="chartRevenueYear"></canvas>
-        <div class="hint">
-          Pipeline $ Unweighted = <b>Estimated $</b>. Weighted = <b>Weighted Pipeline</b>.
-        </div>
-      </div>
-
-      <div class="chartCard">
-        <h3>Revenue Pace (This Month)</h3>
-        <canvas id="chartRevenuePace"></canvas>
-        <div class="hint">
-          Uses your manually-entered <b>Actual Revenue (month-to-date)</b> and projects full-month revenue based on today's date.
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2>Next 3 Months Coverage</h2>
-
-    <div class="charts">
-      <div class="chartCard">
-        <h3>Construction (Target vs Work Tickets)</h3>
-        <canvas id="chartCoverageConstr"></canvas>
-        <div class="hint">
-          Bar color: <b>Red</b> &lt;75% • <b>Yellow</b> 75–90% • <b>Green</b> ≥90% of target hours.
-        </div>
-      </div>
-
-      <div class="chartCard">
-        <h3>Maintenance (Target vs Work Tickets)</h3>
-        <canvas id="chartCoverageMaint"></canvas>
-        <div class="hint">
-          Bar color: <b>Red</b> &lt;75% • <b>Yellow</b> 75–90% • <b>Green</b> ≥90% of target hours.
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2>Hours by Month</h2>
-
-    <div class="charts">
-      <div class="chartCard">
-        <h3>Construction Hours</h3>
-        <canvas id="chartConstruction"></canvas>
-      </div>
-
-      <div class="chartCard">
-        <h3>Maintenance Hours</h3>
-        <canvas id="chartMaintenance"></canvas>
-      </div>
-    </div>
-
-    <div class="hint">
-      Target is a <b>line</b>. Bars are <b>stacked</b>: Work Tickets (Open/Scheduled) + Opportunities (Pipeline Weighted Hours, excludes Won).
-    </div>
-  </section>
-
-  <!-- BOTTOM: Actuals + Data Status -->
-  <section class="panel bottomPanel">
-    </div>
-    <h2>Data Status</h2>
-    <div class="grid3">
-      <div class="card">
-        <div class="cardTitle">Targets</div>
-        <div class="cardBody">
-          <div class="row">
-            <code id="targetsPath">—</code>
-            <span id="targetsStatus" class="pill">—</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="cardTitle">Pipeline</div>
-        <div class="cardBody">
-          <div class="row">
-            <code id="pipelinePath">—</code>
-            <span id="pipelineStatus" class="pill">—</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="cardTitle">Work Tickets</div>
-        <div class="cardBody">
-          <div class="row">
-            <code id="ticketsPath">—</code>
-            <span id="ticketsStatus" class="pill">—</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+  <title>Darios Sales Dashboard</title>
 
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <script src="./app.js"></script>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1b2e;
+      --muted:#8aa0c2;
+      --text:#e7eefc;
+      --border:rgba(255,255,255,0.08);
+      --pill-ok:rgba(34,197,94,0.15);
+      --pill-bad:rgba(239,68,68,0.15);
+      --pill-warn:rgba(250,204,21,0.20);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    }
+    header{
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      position:sticky;
+      top:0;
+      background:rgba(11,18,32,0.9);
+      backdrop-filter: blur(8px);
+      z-index:10;
+    }
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      line-height:1.2;
+    }
+    .title h1{
+      font-size:16px;
+      margin:0;
+      font-weight:700;
+    }
+    .title .sub{
+      font-size:12px;
+      color:var(--muted);
+    }
+    .controls{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    select, button{
+      height:34px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#000;          /* requested: black backdrop */
+      color:#fff;               /* requested: white text */
+      padding:0 10px;
+      font-size:13px;
+      outline:none;
+    }
+    button{
+      cursor:pointer;
+      background:#111827;
+    }
+    button:hover{ filter:brightness(1.1); }
+
+    main{
+      padding:14px;
+      display:grid;
+      gap:12px;
+      max-width:1200px;
+      margin:0 auto;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:12px;
+    }
+    @media (min-width: 980px){
+      .grid-2{ grid-template-columns:1fr 1fr; }
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:12px;
+      box-shadow:0 8px 20px rgba(0,0,0,0.25);
+    }
+    .card h2{
+      margin:0 0 10px 0;
+      font-size:14px;
+      font-weight:700;
+      color:#dce8ff;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .meta{
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .pill{
+      font-size:12px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      white-space:nowrap;
+    }
+    .chart-wrap{
+      height:320px;
+    }
+    .chart-wrap.tall{
+      height:380px;
+    }
+
+    /* Coverage KPI row */
+    .kpi-row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-bottom:8px;
+    }
+    .kpi-pill{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      font-size:12px;
+      white-space:nowrap;
+    }
+
+    /* Bottom status bar */
+    .bottom{
+      position:sticky;
+      bottom:0;
+      background:rgba(11,18,32,0.9);
+      backdrop-filter: blur(8px);
+      border-top:1px solid var(--border);
+      padding:10px 14px;
+      z-index:10;
+    }
+    .status-grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+      max-width:1200px;
+      margin:0 auto;
+    }
+    @media (min-width: 980px){
+      .status-grid{ grid-template-columns: 2fr 1fr; align-items:center; }
+    }
+    .status-left{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+    }
+    .paths{
+      font-size:11px;
+      color:var(--muted);
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+    code{color:#c7d2fe}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="title">
+    <h1>Darios Sales Dashboard</h1>
+    <div class="sub">Targets • Pipeline • Work Tickets • Capacity • SalesAct actuals</div>
+  </div>
+
+  <div class="controls">
+    <label>
+      <select id="viewToggle" title="View">
+        <option value="all">All</option>
+        <option value="construction">Construction</option>
+        <option value="maintenance">Maintenance</option>
+      </select>
+    </label>
+
+    <label>
+      <select id="asOfMonth" title="Month"></select>
+    </label>
+
+    <button id="refreshBtn">Refresh</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2>
+        Revenue vs Target (Year)
+        <span class="meta"><span class="pill" id="salesActStamp"></span></span>
+      </h2>
+      <div class="chart-wrap">
+        <canvas id="chartRevenueYear"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Revenue Pace (Selected Month)</h2>
+      <div class="chart-wrap">
+        <canvas id="chartRevenuePace"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2>Hours by Month (Construction)</h2>
+      <div class="chart-wrap tall">
+        <canvas id="chartConstruction"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Hours by Month (Maintenance)</h2>
+      <div class="chart-wrap tall">
+        <canvas id="chartMaintenance"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2>Next 3 Months Coverage (Construction)</h2>
+      <div id="kpiCoverageConstr" class="kpi-row"></div>
+      <div class="chart-wrap">
+        <canvas id="chartCoverageConstr"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Next 3 Months Coverage (Maintenance)</h2>
+      <div id="kpiCoverageMaint" class="kpi-row"></div>
+      <div class="chart-wrap">
+        <canvas id="chartCoverageMaint"></canvas>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Bottom status bar -->
+<div class="bottom">
+  <div class="status-grid">
+    <div class="status-left">
+      <span class="pill" id="targetsStatus">Targets: …</span>
+      <span class="pill" id="pipelineStatus">Pipeline: …</span>
+      <span class="pill" id="ticketsStatus">Work tickets: …</span>
+      <span class="pill" id="capacityStatus">Capacity: …</span>
+      <span class="pill" id="salesActStatus">SalesAct: …</span>
+      <span class="pill">Last refresh: <span id="lastRefresh">—</span></span>
+    </div>
+    <div class="paths">
+      <div>targets: <code id="targetsPath"></code></div>
+      <div>pipeline: <code id="pipelinePath"></code></div>
+      <div>tickets: <code id="ticketsPath"></code></div>
+      <div>capacity: <code id="capacityPath"></code></div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
 
