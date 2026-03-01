@@ -363,7 +363,7 @@ function buildHoursChart(canvas, labels, targetLine, capLine, barsTickets, barsP
     data: {
       labels,
       datasets: [
-        // Target line BLUE
+        // Target line (BLUE) — not stacked (y2)
         {
           type: "line",
           label: "Target Hours",
@@ -373,8 +373,10 @@ function buildHoursChart(canvas, labels, targetLine, capLine, barsTickets, barsP
           tension: 0.2,
           borderColor: BLUE,
           pointBackgroundColor: BLUE,
+          yAxisID: "y2",
         },
-        // Capacity dashed BLUE
+
+        // Capacity line dashed (BLUE) — not stacked (y2)
         {
           type: "line",
           label: "Capacity",
@@ -384,22 +386,25 @@ function buildHoursChart(canvas, labels, targetLine, capLine, barsTickets, barsP
           tension: 0.2,
           borderColor: BLUE,
           borderDash: [6, 6],
+          yAxisID: "y2",
         },
-        // Work tickets bright green
+
+        // Bars (stacked on y)
         {
           type: "bar",
           label: "Work Tickets (Open/Scheduled)",
           data: barsTickets,
-          stack: "stack1",
+          stack: "hours",
           backgroundColor: TICKETS_GREEN,
+          yAxisID: "y",
         },
-        // Opportunities bright yellow
         {
           type: "bar",
           label: "Opportunities (Pipeline Weighted Hours)",
           data: barsPipeline,
-          stack: "stack1",
+          stack: "hours",
           backgroundColor: OPPS_YELLOW,
+          yAxisID: "y",
         },
       ],
     },
@@ -407,10 +412,27 @@ function buildHoursChart(canvas, labels, targetLine, capLine, barsTickets, barsP
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      plugins: { legend: { position: "top" }, tooltip: { mode: "index", intersect: false } },
+      plugins: {
+        legend: { position: "top" },
+        tooltip: { mode: "index", intersect: false },
+      },
       scales: {
+        // Bars axis (stacked)
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { precision: 0 },
+        },
+
+        // Lines axis (NOT stacked) — hidden but same scale
+        y2: {
+          stacked: false,
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          grid: { drawOnChartArea: false }, // prevents double gridlines
+        },
+
         x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
       },
     },
   });
@@ -806,5 +828,6 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
