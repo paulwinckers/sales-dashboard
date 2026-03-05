@@ -435,13 +435,13 @@ function buildHoursChart(
   capLine,
   barsTickets,
   barsPipeline,
-  barsBase = null,          // ✅ NEW optional stacked base
+  barsBase = null,          // optional stacked base (maintenance placeholder)
   baseLabel = "Extra Work (Placeholder)",
   baseColor = "rgba(168, 85, 247, 0.55)" // purple
 ) {
   const datasets = [];
 
-  // ✅ Optional base bar goes first so it sits at the bottom of the stack
+  // Base bar first so it sits at the bottom
   if (Array.isArray(barsBase)) {
     datasets.push({
       type: "bar",
@@ -453,30 +453,8 @@ function buildHoursChart(
     });
   }
 
-  // Lines (use y2 but hidden; see section 2)
+  // Stacked bars
   datasets.push(
-    {
-      type: "line",
-      label: "Target Hours",
-      data: targetLine,
-      borderWidth: 2,
-      pointRadius: 2,
-      tension: 0.2,
-      borderColor: BLUE,
-      pointBackgroundColor: BLUE,
-      yAxisID: "y2",
-    },
-    {
-      type: "line",
-      label: "Capacity",
-      data: capLine,
-      borderWidth: 2,
-      pointRadius: 0,
-      tension: 0.2,
-      borderColor: BLUE,
-      borderDash: [6, 6],
-      yAxisID: "y2",
-    },
     {
       type: "bar",
       label: "Work Tickets (Open/Scheduled)",
@@ -492,6 +470,32 @@ function buildHoursChart(
       stack: "hours",
       backgroundColor: OPPS_YELLOW,
       yAxisID: "y",
+    },
+
+    // Lines on SAME axis, but each gets its own stack id so they don't add together
+    {
+      type: "line",
+      label: "Target Hours",
+      data: targetLine,
+      borderWidth: 2,
+      pointRadius: 2,
+      tension: 0.2,
+      borderColor: BLUE,
+      pointBackgroundColor: BLUE,
+      yAxisID: "y",
+      stack: "line_target",   // ✅ prevents stacking with capacity
+    },
+    {
+      type: "line",
+      label: "Capacity",
+      data: capLine,
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.2,
+      borderColor: BLUE,
+      borderDash: [6, 6],
+      yAxisID: "y",
+      stack: "line_capacity", // ✅ prevents stacking with target
     }
   );
 
@@ -507,20 +511,10 @@ function buildHoursChart(
       },
       scales: {
         x: { stacked: true },
-
-        // Bars axis (visible)
         y: {
-          stacked: true,
+          stacked: true,     // needed for stacked bars
           beginAtZero: true,
           ticks: { precision: 0 },
-        },
-
-        // Lines axis (hidden, so you only *see* one y-axis)
-        y2: {
-          stacked: false,
-          beginAtZero: true,
-          display: false,                 // ✅ hides 2nd axis
-          grid: { drawOnChartArea: false }
         },
       },
     },
@@ -874,6 +868,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
