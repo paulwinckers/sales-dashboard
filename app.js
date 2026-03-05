@@ -15,7 +15,7 @@ const FILES = {
   capacityCsv: new URL("data/capacity.csv", BASE).toString(),
 };
 
-const TICKET_ACTIVE_STATUS_WORDS = ["open", "scheduled"];
+const TICKET_ACTIVE_STATUS_WORDS = ["open", "scheduled", "complete", "completed"];
 const WON_STATUS_WORDS = ["won", "closed won", "sold"];
 const LOST_STATUS_WORDS = ["lost", "closed lost", "no sale", "cancel"];
 
@@ -868,6 +868,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
