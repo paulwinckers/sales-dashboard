@@ -428,64 +428,105 @@ function buildRevenuePaceChart(canvas, targetMonthRev, actualMonthRev, projected
 }
 
 // Hours chart: bars stacked; lines separate axis (prevents capacity adding to target)
-function buildHoursChart(canvas, labels, targetLine, capLine, barsTickets, barsPipeline) {
-  return new Chart(canvas.getContext("2d"), {
-    data: {
-      labels,
-      datasets: [
-        {
-          type: "line",
-          label: "Target Hours",
-          data: targetLine,
-          borderWidth: 2,
-          pointRadius: 2,
-          tension: 0.2,
-          borderColor: BLUE,
-          pointBackgroundColor: BLUE,
-          yAxisID: "y2",
-        },
-        {
-          type: "line",
-          label: "Capacity",
-          data: capLine,
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.2,
-          borderColor: BLUE,
-          borderDash: [6, 6],
-          yAxisID: "y2",
-        },
-        {
-          type: "bar",
-          label: "Work Tickets (Open/Scheduled)",
-          data: barsTickets,
-          stack: "hours",
-          backgroundColor: TICKETS_GREEN,
-          yAxisID: "y",
-        },
-        {
-          type: "bar",
-          label: "Opportunities (Pipeline Weighted Hours)",
-          data: barsPipeline,
-          stack: "hours",
-          backgroundColor: OPPS_YELLOW,
-          yAxisID: "y",
-        },
-      ],
+function buildHoursChart(
+  canvas,
+  labels,
+  targetLine,
+  capLine,
+  barsTickets,
+  barsPipeline,
+  barsBase = null,          // ✅ NEW optional stacked base
+  baseLabel = "Extra Work (Placeholder)",
+  baseColor = "rgba(168, 85, 247, 0.55)" // purple
+) {
+  const datasets = [];
+
+  // ✅ Optional base bar goes first so it sits at the bottom of the stack
+  if (Array.isArray(barsBase)) {
+    datasets.push({
+      type: "bar",
+      label: baseLabel,
+      data: barsBase,
+      stack: "hours",
+      backgroundColor: baseColor,
+      yAxisID: "y",
+    });
+  }
+
+  // Lines (use y2 but hidden; see section 2)
+  datasets.push(
+    {
+      type: "line",
+      label: "Target Hours",
+      data: targetLine,
+      borderWidth: 2,
+      pointRadius: 2,
+      tension: 0.2,
+      borderColor: BLUE,
+      pointBackgroundColor: BLUE,
+      yAxisID: "y2",
     },
+    {
+      type: "line",
+      label: "Capacity",
+      data: capLine,
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.2,
+      borderColor: BLUE,
+      borderDash: [6, 6],
+      yAxisID: "y2",
+    },
+    {
+      type: "bar",
+      label: "Work Tickets (Open/Scheduled)",
+      data: barsTickets,
+      stack: "hours",
+      backgroundColor: TICKETS_GREEN,
+      yAxisID: "y",
+    },
+    {
+      type: "bar",
+      label: "Opportunities (Pipeline Weighted Hours)",
+      data: barsPipeline,
+      stack: "hours",
+      backgroundColor: OPPS_YELLOW,
+      yAxisID: "y",
+    }
+  );
+
+  return new Chart(canvas.getContext("2d"), {
+    data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      plugins: { legend: { position: "top" }, tooltip: { mode: "index", intersect: false } },
+      plugins: {
+        legend: { position: "top" },
+        tooltip: { mode: "index", intersect: false },
+      },
       scales: {
         x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
-        y2: { stacked: false, beginAtZero: true, ticks: { precision: 0 }, grid: { drawOnChartArea: false } },
+
+        // Bars axis (visible)
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { precision: 0 },
+        },
+
+        // Lines axis (hidden, so you only *see* one y-axis)
+        y2: {
+          stacked: false,
+          beginAtZero: true,
+          display: false,                 // ✅ hides 2nd axis
+          grid: { drawOnChartArea: false }
+        },
       },
     },
   });
 }
+
 
 function buildCoverageChart(canvas, labels, targetLine, workBars) {
   return new Chart(canvas.getContext("2d"), {
@@ -668,7 +709,12 @@ function renderAll(state) {
 
   const constrPipe = monthKeys.map(m => pipeConstrMap[m] || 0);
   const maintPipe  = monthKeys.map(m => pipeMaintMap[m] || 0);
-
+// ✅ Maintenance placeholder: 225 hours Apr–Oct
+  const maintExtra = monthKeys.map(mk => {
+  // mk is yyyy-mm
+  const mm = Number(mk.slice(5, 7));
+  return (mm >= 4 && mm <= 10) ? 225 : 0;
+);
   chartConstr = destroy(chartConstr);
   chartMaint = destroy(chartMaint);
 
@@ -681,14 +727,17 @@ function renderAll(state) {
     constrPipe
   );
 
-  chartMaint = buildHoursChart(
-    document.getElementById("chartMaintenance"),
-    monthKeys,
-    maintTarget,
-    maintCap,
-    maintTickets,
-    maintPipe
-  );
+chartMaint = buildHoursChart(
+  document.getElementById("chartMaintenance"),
+  monthKeys,
+  maintTarget,
+  maintCap,
+  maintTickets,
+  maintPipe,
+  maintExtra,                          // ✅ base purple block
+  "Extra Work (Placeholder)",
+  "rgba(168, 85, 247, 0.55)"
+);
 
   // --- Next 3 months coverage (based on work tickets vs target) ---
   let startIdx = monthKeys.indexOf(mk);
@@ -821,4 +870,5 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
