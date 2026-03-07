@@ -703,7 +703,7 @@ function renderAll(state) {
   const constrPipe = monthKeys.map(m => pipeConstrMap[m] || 0);
   const maintPipe  = monthKeys.map(m => pipeMaintMap[m] || 0);
 
-  // Extra maintenance placeholder work: 225 hrs Apr–Oct 2026
+// Extra maintenance placeholder work: 225 hrs Apr–Oct 2026
   const maintExtra = monthKeys.map(mk => {
   const year = Number(mk.slice(0, 4));
   const mm = Number(mk.slice(5, 7));
@@ -712,9 +712,6 @@ function renderAll(state) {
 
 chartConstr = destroy(chartConstr);
 chartMaint = destroy(chartMaint);
- 
-  chartConstr = destroy(chartConstr);
-  chartMaint = destroy(chartMaint);
 
   chartConstr = buildHoursChart(
     document.getElementById("chartConstruction"),
@@ -868,6 +865,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
