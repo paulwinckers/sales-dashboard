@@ -875,7 +875,18 @@ async function loadAllData(state) {
     state.capacity = { constCap: {}, maintCap: {}, _count: 0 };
     setPill("capacityStatus", false, `Capacity: Failed (${e?.message || e})`);
   }
-
+  // Workdays
+  try {
+    state.workdaysByMonth = await loadWorkdays(FILES.workdaysCsv, state.targets.monthKeys);
+    setPill("workdaysStatus", true, "Workdays: Loaded");
+  } catch (e) {
+    console.error("Workdays failed:", e);
+    state.workdaysByMonth = {};
+    for (const mk of state.targets.monthKeys) {
+      state.workdaysByMonth[mk] = { worked: 0, remaining: 0, total: 0 };
+    }
+    setPill("workdaysStatus", false, `Workdays: Failed (${e?.message || e})`);
+  }
   // SalesAct actuals
   try {
     state.salesActByMonth = await loadSalesActMonthly(LOGBOOK_URL, state.targets.monthKeys);
@@ -916,12 +927,14 @@ function wireControls(state) {
     tickets: [],
     capacity: { constCap: {}, maintCap: {}, _count: 0 },
     salesActByMonth: {},
+    workdaysByMonth: {},
   };
 
   wireControls(state);
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
