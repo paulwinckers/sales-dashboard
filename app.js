@@ -148,18 +148,15 @@ function bucketSumByMonth(items, getDate, getValue, monthKeys) {
 function sumMonths(seriesByMonth, monthKeys) {
   return monthKeys.reduce((acc, k) => acc + (seriesByMonth[k] || 0), 0);
 }
-function projectionForMonth(mk, actualMtd, workdaysByMonth) {
-  const wd = workdaysByMonth?.[mk];
+function projectionForMonth(mk, actualMtd, workdaysByMonth, view = "all") {
+  const wd = workdaysByMonth?.[mk]?.[view];
   if (!wd) return actualMtd;
 
   const worked = Number(wd.worked || 0);
+  const total = Number(wd.total || 0);
   const remaining = Number(wd.remaining || 0);
-  const total = Number(wd.total || (worked + remaining) || 0);
 
-  // No usable workday data
   if (worked <= 0 || total <= 0) return actualMtd;
-
-  // If no remaining workdays, month is done; projected = actual
   if (remaining <= 0) return actualMtd;
 
   return (actualMtd / worked) * total;
@@ -294,60 +291,51 @@ async function loadWorkdays(url, monthKeys) {
     transformHeader: h => String(h || "").trim(),
   });
 
-  const fields = parsed.meta?.fields || [];
-
-  const norm = (s) =>
-    String(s || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s_()-]+/g, "");
-
-  const findCol = (names) => {
-    const wanted = names.map(norm);
-    return fields.find(f => wanted.includes(norm(f))) || null;
-  };
-
-  const monthCol = findCol(["month"]);
-  const workedCol = findCol([
-    "worked days",
-    "days worked",
-    "workdays elapsed",
-    "elapsed workdays",
-    "workeddays",
-    "workeddays"
-  ]);
-  const remainingCol = findCol([
-    "remaining workdays",
-    "workdays remaining",
-    "days remaining",
-    "remaining days"
-  ]);
-  const totalCol = findCol([
-    "total workdays",
-    "workdays",
-    "total days"
-  ]);
-
   const out = {};
   for (const mk of monthKeys) {
-    out[mk] = { worked: 0, remaining: 0, total: 0 };
+    out[mk] = {
+      all: { worked: 0, remaining: 0, total: 0 },
+      construction: { worked: 0, remaining: 0, total: 0 },
+      maintenance: { worked: 0, remaining: 0, total: 0 },
+    };
   }
 
+  const today = new Date();
+  const todayKey = monthKeyFromDate(today);
+
   for (const r of parsed.data || []) {
-    const mk = normalizeMonthKey(r[monthCol]);
-    if (!mk || !(mk in out)) continue;
+    const d = parseDateAny(r.Date);
+    if (!d) continue;
 
-    const worked = parseNumberLoose(r[workedCol]);
-    const remaining = parseNumberLoose(r[remainingCol]);
-    const total = totalCol
-      ? parseNumberLoose(r[totalCol])
-      : (worked + remaining);
+    const mk = monthKeyFromDate(d);
+    if (!(mk in out)) continue;
 
-    out[mk] = {
-      worked,
-      remaining,
-      total: total || (worked + remaining),
-    };
+    const dayType = String(r.DayType || "").trim().toLowerCase();
+    const maintHours = parseNumberLoose(r.MaintenanceHours);
+    const constrHours = parseNumberLoose(r.ConstructionHours);
+
+    const isWorkday = !["weekend", "stat", "holiday"].includes(dayType);
+
+    // "All" view: any non-weekend/non-stat working day
+    if (isWorkday) {
+      out[mk].all.total += 1;
+      if (d <= today) out[mk].all.worked += 1;
+      else out[mk].all.remaining += 1;
+    }
+
+    // Construction-specific workday: workday with construction hours scheduled
+    if (isWorkday && constrHours > 0) {
+      out[mk].construction.total += 1;
+      if (d <= today) out[mk].construction.worked += 1;
+      else out[mk].construction.remaining += 1;
+    }
+
+    // Maintenance-specific workday: workday with maintenance hours scheduled
+    if (isWorkday && maintHours > 0) {
+      out[mk].maintenance.total += 1;
+      if (d <= today) out[mk].maintenance.worked += 1;
+      else out[mk].maintenance.remaining += 1;
+    }
   }
 
   return out;
@@ -715,10 +703,11 @@ function renderAll(state) {
   const targetMonthRev = scope.targetMonthRev(state.targets, mk);
   const salesAct = state.salesActByMonth?.[mk] || {};
   const actualMonthRev = scope.actualMonthRev(salesAct);
-  const projectedRev = projectionForMonth(
+   const projectedRev = projectionForMonth(
     mk,
     actualMonthRev,
-    state.workdaysByMonth
+    state.workdaysByMonth,
+    view
   );
 
   chartRevenuePace = destroy(chartRevenuePace);
@@ -952,6 +941,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
