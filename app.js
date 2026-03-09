@@ -148,19 +148,19 @@ function bucketSumByMonth(items, getDate, getValue, monthKeys) {
 function sumMonths(seriesByMonth, monthKeys) {
   return monthKeys.reduce((acc, k) => acc + (seriesByMonth[k] || 0), 0);
 }
-function projectionForMonth(mk, actualMtd, workdaysByMonth, updatedAt = "") {
+function projectionForMonth(mk, actualMtd, workdaysByMonth) {
   const wd = workdaysByMonth?.[mk];
   if (!wd) return actualMtd;
-
-  const asOf = parseDateAny(updatedAt) || new Date();
-  const asOfMk = monthKeyFromDate(asOf);
-  if (mk !== asOfMk) return actualMtd;
 
   const worked = Number(wd.worked || 0);
   const remaining = Number(wd.remaining || 0);
   const total = Number(wd.total || (worked + remaining) || 0);
 
+  // No usable workday data
   if (worked <= 0 || total <= 0) return actualMtd;
+
+  // If no remaining workdays, month is done; projected = actual
+  if (remaining <= 0) return actualMtd;
 
   return (actualMtd / worked) * total;
 }
@@ -295,13 +295,38 @@ async function loadWorkdays(url, monthKeys) {
   });
 
   const fields = parsed.meta?.fields || [];
-  const findCol = (names) =>
-    fields.find(f => names.includes(String(f).trim().toLowerCase())) || null;
+
+  const norm = (s) =>
+    String(s || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_()-]+/g, "");
+
+  const findCol = (names) => {
+    const wanted = names.map(norm);
+    return fields.find(f => wanted.includes(norm(f))) || null;
+  };
 
   const monthCol = findCol(["month"]);
-  const workedCol = findCol(["workeddays", "daysworked", "workeddays", "elapsedworkdays", "workdayselapsed"]);
-  const remainingCol = findCol(["remainingworkdays", "workdaysremaining", "daysremaining"]);
-  const totalCol = findCol(["totalworkdays", "workdays"]);
+  const workedCol = findCol([
+    "worked days",
+    "days worked",
+    "workdays elapsed",
+    "elapsed workdays",
+    "workeddays",
+    "workeddays"
+  ]);
+  const remainingCol = findCol([
+    "remaining workdays",
+    "workdays remaining",
+    "days remaining",
+    "remaining days"
+  ]);
+  const totalCol = findCol([
+    "total workdays",
+    "workdays",
+    "total days"
+  ]);
 
   const out = {};
   for (const mk of monthKeys) {
@@ -327,7 +352,6 @@ async function loadWorkdays(url, monthKeys) {
 
   return out;
 }
-
 async function loadPipeline(url) {
   const text = await fetchText(url);
   const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, delimiter: "" });
@@ -694,8 +718,7 @@ function renderAll(state) {
   const projectedRev = projectionForMonth(
     mk,
     actualMonthRev,
-    state.workdaysByMonth,
-    salesAct?.updatedAt || ""
+    state.workdaysByMonth
   );
 
   chartRevenuePace = destroy(chartRevenuePace);
@@ -929,6 +952,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
