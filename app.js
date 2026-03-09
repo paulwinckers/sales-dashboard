@@ -148,15 +148,12 @@ function bucketSumByMonth(items, getDate, getValue, monthKeys) {
 function sumMonths(seriesByMonth, monthKeys) {
   return monthKeys.reduce((acc, k) => acc + (seriesByMonth[k] || 0), 0);
 }
-
 function projectionForMonth(mk, actualMtd, workdaysByMonth, updatedAt = "") {
   const wd = workdaysByMonth?.[mk];
   if (!wd) return actualMtd;
 
   const asOf = parseDateAny(updatedAt) || new Date();
   const asOfMk = monthKeyFromDate(asOf);
-
-  // Only project the month currently in progress
   if (mk !== asOfMk) return actualMtd;
 
   const worked = Number(wd.worked || 0);
@@ -165,10 +162,8 @@ function projectionForMonth(mk, actualMtd, workdaysByMonth, updatedAt = "") {
 
   if (worked <= 0 || total <= 0) return actualMtd;
 
-  const revPerWorkedDay = actualMtd / worked;
-  return revPerWorkedDay * total;
+  return (actualMtd / worked) * total;
 }
-
 // Spread maintenance pipeline weighted hours from Start Date month -> November inclusive
 function bucketMaintenancePipelineSpread(pipelineRows, monthKeys) {
   const out = {};
@@ -697,11 +692,11 @@ function renderAll(state) {
   const salesAct = state.salesActByMonth?.[mk] || {};
   const actualMonthRev = scope.actualMonthRev(salesAct);
   const projectedRev = projectionForMonth(
-  mk,
-  actualMonthRev,
-  state.workdaysByMonth,
-  salesAct?.updatedAt || ""
-);
+    mk,
+    actualMonthRev,
+    state.workdaysByMonth,
+    salesAct?.updatedAt || ""
+  );
 
   chartRevenuePace = destroy(chartRevenuePace);
   chartRevenuePace = buildRevenuePaceChart(
@@ -934,6 +929,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
