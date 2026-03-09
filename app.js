@@ -13,6 +13,7 @@ const FILES = {
   pipelineCsv: new URL("data/pipeline.csv", BASE).toString(),
   workTicketsXlsx: new URL("data/work_tickets.xlsx", BASE).toString(),
   capacityCsv: new URL("data/capacity.csv", BASE).toString(),
+  workdaysCsv: new URL("data/2026_Workdays.csv", BASE).toString(),
 };
 
 const TICKET_ACTIVE_STATUS_WORDS = ["open", "scheduled", "complete", "completed"];
@@ -148,15 +149,24 @@ function sumMonths(seriesByMonth, monthKeys) {
   return monthKeys.reduce((acc, k) => acc + (seriesByMonth[k] || 0), 0);
 }
 
-function projectionForMonth(mk, actualMtd) {
-  const now = new Date();
-  const currentMk = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  if (mk !== currentMk) return actualMtd;
+function projectionForMonth(mk, actualMtd, workdaysByMonth, updatedAt = "") {
+  const wd = workdaysByMonth?.[mk];
+  if (!wd) return actualMtd;
 
-  const day = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  if (day <= 0) return actualMtd;
-  return (actualMtd / day) * daysInMonth;
+  const asOf = parseDateAny(updatedAt) || new Date();
+  const asOfMk = monthKeyFromDate(asOf);
+
+  // Only project the month currently in progress
+  if (mk !== asOfMk) return actualMtd;
+
+  const worked = Number(wd.worked || 0);
+  const remaining = Number(wd.remaining || 0);
+  const total = Number(wd.total || (worked + remaining) || 0);
+
+  if (worked <= 0 || total <= 0) return actualMtd;
+
+  const revPerWorkedDay = actualMtd / worked;
+  return revPerWorkedDay * total;
 }
 
 // Spread maintenance pipeline weighted hours from Start Date month -> November inclusive
@@ -279,6 +289,48 @@ async function loadCapacity(url, monthKeys) {
   }
 
   return { constCap, maintCap, _count: count };
+}
+async function loadWorkdays(url, monthKeys) {
+  const text = await fetchText(url);
+  const parsed = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: true,
+    delimiter: "",
+    transformHeader: h => String(h || "").trim(),
+  });
+
+  const fields = parsed.meta?.fields || [];
+  const findCol = (names) =>
+    fields.find(f => names.includes(String(f).trim().toLowerCase())) || null;
+
+  const monthCol = findCol(["month"]);
+  const workedCol = findCol(["workeddays", "daysworked", "workeddays", "elapsedworkdays", "workdayselapsed"]);
+  const remainingCol = findCol(["remainingworkdays", "workdaysremaining", "daysremaining"]);
+  const totalCol = findCol(["totalworkdays", "workdays"]);
+
+  const out = {};
+  for (const mk of monthKeys) {
+    out[mk] = { worked: 0, remaining: 0, total: 0 };
+  }
+
+  for (const r of parsed.data || []) {
+    const mk = normalizeMonthKey(r[monthCol]);
+    if (!mk || !(mk in out)) continue;
+
+    const worked = parseNumberLoose(r[workedCol]);
+    const remaining = parseNumberLoose(r[remainingCol]);
+    const total = totalCol
+      ? parseNumberLoose(r[totalCol])
+      : (worked + remaining);
+
+    out[mk] = {
+      worked,
+      remaining,
+      total: total || (worked + remaining),
+    };
+  }
+
+  return out;
 }
 
 async function loadPipeline(url) {
@@ -644,7 +696,12 @@ function renderAll(state) {
   const targetMonthRev = scope.targetMonthRev(state.targets, mk);
   const salesAct = state.salesActByMonth?.[mk] || {};
   const actualMonthRev = scope.actualMonthRev(salesAct);
-  const projectedRev = projectionForMonth(mk, actualMonthRev);
+  const projectedRev = projectionForMonth(
+  mk,
+  actualMonthRev,
+  state.workdaysByMonth,
+  salesAct?.updatedAt || ""
+);
 
   chartRevenuePace = destroy(chartRevenuePace);
   chartRevenuePace = buildRevenuePaceChart(
@@ -865,6 +922,7 @@ function wireControls(state) {
   await loadAllData(state);
   renderAll(state);
 })();
+
 
 
 
