@@ -153,13 +153,22 @@ function projectionForMonth(mk, actualMtd, workdaysByMonth, view = "all") {
   if (!wd) return actualMtd;
 
   const worked = Number(wd.worked || 0);
-  const total = Number(wd.total || 0);
   const remaining = Number(wd.remaining || 0);
+  const total = Number(wd.total || (worked + remaining) || 0);
 
   if (worked <= 0 || total <= 0) return actualMtd;
   if (remaining <= 0) return actualMtd;
 
-  return (actualMtd / worked) * total;
+  return (actualMtd * total) / worked;
+}
+function projectionForAllMonth(mk, salesAct, workdaysByMonth) {
+  const constrActual = Number(salesAct?.constrRevMTD || 0);
+  const maintActual = Number(salesAct?.maintRevMTD || 0);
+
+  const constrProj = projectionForMonth(mk, constrActual, workdaysByMonth, "construction");
+  const maintProj = projectionForMonth(mk, maintActual, workdaysByMonth, "maintenance");
+
+  return constrProj + maintProj;
 }
 // Spread maintenance pipeline weighted hours from Start Date month -> November inclusive
 function bucketMaintenancePipelineSpread(pipelineRows, monthKeys) {
@@ -290,6 +299,56 @@ async function loadWorkdays(url, monthKeys) {
     delimiter: "",
     transformHeader: h => String(h || "").trim(),
   });
+
+  const out = {};
+  for (const mk of monthKeys) {
+    out[mk] = {
+      all: { worked: 0, remaining: 0, total: 0 },
+      construction: { worked: 0, remaining: 0, total: 0 },
+      maintenance: { worked: 0, remaining: 0, total: 0 },
+    };
+  }
+
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  for (const r of parsed.data || []) {
+    const d = parseDateAny(r.Date);
+    if (!d) continue;
+
+    const mk = monthKeyFromDate(d);
+    if (!(mk in out)) continue;
+
+    const dayType = String(r.DayType || "").trim().toLowerCase();
+    const maintHours = parseNumberLoose(r.MaintenanceHours);
+    const constrHours = parseNumberLoose(r.ConstructionHours);
+
+    const isWorkday = !["weekend", "stat", "holiday"].includes(dayType);
+
+    // "All" = any real workday
+    if (isWorkday) {
+      out[mk].all.total += 1;
+      if (d <= today) out[mk].all.worked += 1;
+      else out[mk].all.remaining += 1;
+    }
+
+    // Construction = only days with construction hours > 0
+    if (isWorkday && constrHours > 0) {
+      out[mk].construction.total += 1;
+      if (d <= today) out[mk].construction.worked += 1;
+      else out[mk].construction.remaining += 1;
+    }
+
+    // Maintenance = only days with maintenance hours > 0
+    if (isWorkday && maintHours > 0) {
+      out[mk].maintenance.total += 1;
+      if (d <= today) out[mk].maintenance.worked += 1;
+      else out[mk].maintenance.remaining += 1;
+    }
+  }
+
+  return out;
+}
 
   const out = {};
   for (const mk of monthKeys) {
@@ -703,13 +762,18 @@ function renderAll(state) {
   const targetMonthRev = scope.targetMonthRev(state.targets, mk);
   const salesAct = state.salesActByMonth?.[mk] || {};
   const actualMonthRev = scope.actualMonthRev(salesAct);
-   const projectedRev = projectionForMonth(
+  const projectedRev = projectionForMonth(
     mk,
     actualMonthRev,
     state.workdaysByMonth,
     view
   );
-
+  let projectedRev;
+  if (view === "all") {
+    projectedRev = projectionForAllMonth(mk, salesAct, state.workdaysByMonth);
+  } else {
+    projectedRev = projectionForMonth(mk, actualMonthRev, state.workdaysByMonth, view);
+  }
   chartRevenuePace = destroy(chartRevenuePace);
   chartRevenuePace = buildRevenuePaceChart(
     document.getElementById("chartRevenuePace"),
