@@ -310,7 +310,7 @@ async function loadWorkdays(url, monthKeys) {
   }
 
   const today = new Date();
-  today.setHours(23, 59, 59, 999);
+  today.setHours(0,0,0,0);   // start of today so today counts as remaining
 
   for (const r of parsed.data || []) {
     const d = parseDateAny(r.Date);
