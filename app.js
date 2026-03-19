@@ -437,7 +437,99 @@ async function loadSalesActMonthly(baseUrl, monthKeys) {
 
   return out;
 }
+async function loadOpsDailyLogWorkdays(baseUrl, monthKeys) {
+  const out = {};
+  for (const mk of monthKeys) {
+    out[mk] = {
+      all: { worked: 0, remaining: 0, total: 0 },
+      construction: { worked: 0, remaining: 0, total: 0 },
+      maintenance: { worked: 0, remaining: 0, total: 0 },
+    };
+  }
 
+  const url = `${baseUrl}?tab=OpsDailyLog&_=${Date.now()}`;
+  const res = await fetch(url, { cache: "no-store" });
+  const raw = await res.text();
+  const t = raw.trim();
+
+  if (t.startsWith("<!DOCTYPE") || t.startsWith("<html") || t.includes("<body")) {
+    throw new Error("OpsDailyLog returned HTML, not JSON.");
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(t);
+  } catch {
+    throw new Error("OpsDailyLog response is not valid JSON.");
+  }
+
+  if (payload?.ok === false) {
+    throw new Error(`OpsDailyLog ok:false (${payload.error || "unknown error"})`);
+  }
+
+  const rows = payload?.rows || [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // revenue is assumed current through yesterday
+
+  const pickNum = (row, keys) => {
+    for (const k of keys) {
+      if (row[k] != null && String(row[k]).trim() !== "") {
+        return parseNumberLoose(row[k]);
+      }
+    }
+    return 0;
+  };
+
+  for (const r of rows) {
+    const d = parseDateAny(r.Date);
+    if (!d) continue;
+
+    const mk = monthKeyFromDate(d);
+    if (!(mk in out)) continue;
+
+    // Adjust these candidate column names if your OpsDailyLog headers differ
+    const maintTarget = pickNum(r, [
+      "DailyMain",
+      "Maintenance Target Hours",
+      "Maint Target Hours",
+      "Target Maintenance Hours",
+      "MaintenanceHours"
+    ]);
+
+    const constrTarget = pickNum(r, [
+      "DailyCons",
+      "Construction Target Hours",
+      "Constr Target Hours",
+      "Target Construction Hours",
+      "ConstructionHours"
+    ]);
+
+    const hasMaint = maintTarget > 0;
+    const hasConstr = constrTarget > 0;
+    const hasAny = hasMaint || hasConstr;
+
+    if (hasAny) {
+      out[mk].all.total += 1;
+      if (d < today) out[mk].all.worked += 1;
+      else out[mk].all.remaining += 1;
+    }
+
+    if (hasConstr) {
+      out[mk].construction.total += 1;
+      if (d < today) out[mk].construction.worked += 1;
+      else out[mk].construction.remaining += 1;
+    }
+
+    if (hasMaint) {
+      out[mk].maintenance.total += 1;
+      if (d < today) out[mk].maintenance.worked += 1;
+      else out[mk].maintenance.remaining += 1;
+    }
+  }
+
+  return out;
+}
 // ------------------------------------------------------------
 // Charts
 // ------------------------------------------------------------
@@ -897,15 +989,19 @@ async function loadAllData(state) {
     state.capacity = { constCap: {}, maintCap: {}, _count: 0 };
     setPill("capacityStatus", false, `Capacity: Failed (${e?.message || e})`);
   }
-  // Workdays
+  // Workdays from OpsDailyLog target columns
   try {
-    state.workdaysByMonth = await loadWorkdays(FILES.workdaysCsv, state.targets.monthKeys);
-    setPill("workdaysStatus", true, "Workdays: Loaded");
+    state.workdaysByMonth = await loadOpsDailyLogWorkdays(LOGBOOK_URL, state.targets.monthKeys);
+    setPill("workdaysStatus", true, "Workdays: Loaded from OpsDailyLog");
   } catch (e) {
-    console.error("Workdays failed:", e);
+    console.error("OpsDailyLog workdays failed:", e);
     state.workdaysByMonth = {};
     for (const mk of state.targets.monthKeys) {
-      state.workdaysByMonth[mk] = { worked: 0, remaining: 0, total: 0 };
+      state.workdaysByMonth[mk] = {
+        all: { worked: 0, remaining: 0, total: 0 },
+        construction: { worked: 0, remaining: 0, total: 0 },
+        maintenance: { worked: 0, remaining: 0, total: 0 },
+      };
     }
     setPill("workdaysStatus", false, `Workdays: Failed (${e?.message || e})`);
   }
