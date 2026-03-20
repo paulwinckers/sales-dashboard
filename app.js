@@ -525,7 +525,6 @@ async function loadOpsDailyLogWorkdays(baseUrl, monthKeys) {
   console.log("OpsDailyLog workdays by month", out);
   return out;
 }
-}
 // ------------------------------------------------------------
 // Charts
 // ------------------------------------------------------------
