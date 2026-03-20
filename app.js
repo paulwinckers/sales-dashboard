@@ -150,11 +150,27 @@ function sumMonths(seriesByMonth, monthKeys) {
 }
 function projectionForMonth(mk, actualMtd, workdaysByMonth, view = "all") {
   const wd = workdaysByMonth?.[mk]?.[view];
+
+  console.log("projectionForMonth debug", {
+    mk,
+    view,
+    actualMtd,
+    wd
+  });
+
   if (!wd) return actualMtd;
 
   const worked = Number(wd.worked || 0);
   const remaining = Number(wd.remaining || 0);
   const total = Number(wd.total || (worked + remaining) || 0);
+
+  console.log("projectionForMonth counts", {
+    mk,
+    view,
+    worked,
+    remaining,
+    total
+  });
 
   if (worked <= 0 || total <= 0) return actualMtd;
   if (remaining <= 0) return actualMtd;
@@ -470,43 +486,21 @@ async function loadOpsDailyLogWorkdays(baseUrl, monthKeys) {
   const rows = payload?.rows || [];
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // revenue is assumed current through yesterday
-
-  const pickNum = (row, keys) => {
-    for (const k of keys) {
-      if (row[k] != null && String(row[k]).trim() !== "") {
-        return parseNumberLoose(row[k]);
-      }
-    }
-    return 0;
-  };
+  today.setHours(0, 0, 0, 0); // today is NOT counted as worked
 
   for (const r of rows) {
     const d = parseDateAny(r.Date);
     if (!d) continue;
+    d.setHours(0, 0, 0, 0);
 
     const mk = monthKeyFromDate(d);
     if (!(mk in out)) continue;
 
-    // Adjust these candidate column names if your OpsDailyLog headers differ
-    const maintTarget = pickNum(r, [
-      "DailyMain",
-      "Maintenance Target Hours",
-      "Maint Target Hours",
-      "Target Maintenance Hours",
-      "MaintenanceHours"
-    ]);
+    const dailyMain = parseNumberLoose(r.DailyMain);
+    const dailyCons = parseNumberLoose(r.DailyCons);
 
-    const constrTarget = pickNum(r, [
-      "DailyCons",
-      "Construction Target Hours",
-      "Constr Target Hours",
-      "Target Construction Hours",
-      "ConstructionHours"
-    ]);
-
-    const hasMaint = maintTarget > 0;
-    const hasConstr = constrTarget > 0;
+    const hasMaint = dailyMain > 0;
+    const hasConstr = dailyCons > 0;
     const hasAny = hasMaint || hasConstr;
 
     if (hasAny) {
@@ -528,7 +522,9 @@ async function loadOpsDailyLogWorkdays(baseUrl, monthKeys) {
     }
   }
 
+  console.log("OpsDailyLog workdays by month", out);
   return out;
+}
 }
 // ------------------------------------------------------------
 // Charts
@@ -1000,7 +996,7 @@ async function loadAllData(state) {
     state.capacity = { constCap: {}, maintCap: {}, _count: 0 };
     setPill("capacityStatus", false, `Capacity: Failed (${e?.message || e})`);
   }
-  // Workdays from OpsDailyLog target columns
+  // Workdays from OpsDailyLog
   try {
     state.workdaysByMonth = await loadOpsDailyLogWorkdays(LOGBOOK_URL, state.targets.monthKeys);
     setPill("workdaysStatus", true, "Workdays: Loaded from OpsDailyLog");
