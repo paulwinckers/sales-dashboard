@@ -335,8 +335,8 @@ async function loadWorkdays(url, monthKeys) {
     if (!(mk in out)) continue;
 
     const dayType = String(r.DayType || "").trim().toLowerCase();
-    const maintHours = parseNumberLoose(r.TargetMaint);
-    const constrHours = parseNumberLoose(r.TargetConst);
+    const maintHours = parseNumberLoose(r.TargetMaint ?? 0);
+    const constrHours = parseNumberLoose(r.TargetConst ?? 0);
 
     const isWorkday = !["weekend", "stat", "holiday"].includes(dayType);
 
