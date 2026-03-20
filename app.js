@@ -578,12 +578,12 @@ function buildRevenuePaceChart(canvas, targetMonthRev, actualMonthRev, projected
         {
           label: "Actual (MTD from SalesAct)",
           data: [actualMonthRev],
-          backgroundColor: "rgba(34, 197, 94, 0.85)"   // Green
+          backgroundColor: "rgba(34, 197, 94, 0.85)"
         },
         {
           label: "Projected (Full Month)",
           data: [projectedFullMonthRev],
-          backgroundColor: "rgba(168, 85, 247, 0.80)"  // Purple
+          backgroundColor: "rgba(168, 85, 247, 0.80)"
         },
       ],
     },
