@@ -495,11 +495,11 @@ async function loadOpsDailyLogWorkdays(baseUrl, monthKeys) {
     const mk = monthKeyFromDate(d);
     if (!(mk in out)) continue;
 
-    const dailyMain = parseNumberLoose(r.DailyMain);
-    const dailyCons = parseNumberLoose(r.DailyCons);
+    const maintHours = parseNumberLoose(r.TargetMaint ?? 0);
+    const constrHours = parseNumberLoose(r.TargetConst ?? 0);
 
-    const hasMaint = dailyMain > 0;
-    const hasConstr = dailyCons > 0;
+    const hasMaint = maintHours > 0;
+    const hasConstr = constrHours > 0;
     const hasAny = hasMaint || hasConstr;
 
     if (hasAny) {
