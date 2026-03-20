@@ -328,21 +328,21 @@ async function loadWorkdays(url, monthKeys) {
     // "All" = any real workday
     if (isWorkday) {
       out[mk].all.total += 1;
-      if (d <= today) out[mk].all.worked += 1;
+      if (d < today) out[mk].all.worked += 1;
       else out[mk].all.remaining += 1;
     }
 
     // Construction = only days with construction hours > 0
     if (isWorkday && constrHours > 0) {
       out[mk].construction.total += 1;
-      if (d <= today) out[mk].construction.worked += 1;
+      if (d < today) out[mk].construction.worked += 1;
       else out[mk].construction.remaining += 1;
     }
 
     // Maintenance = only days with maintenance hours > 0
     if (isWorkday && maintHours > 0) {
       out[mk].maintenance.total += 1;
-      if (d <= today) out[mk].maintenance.worked += 1;
+      if (d < today) out[mk].maintenance.worked += 1;
       else out[mk].maintenance.remaining += 1;
     }
   }
@@ -574,9 +574,21 @@ function buildRevenuePaceChart(canvas, targetMonthRev, actualMonthRev, projected
     data: {
       labels: ["Revenue"],
       datasets: [
-        { label: "Target (Full Month)", data: [targetMonthRev] },
-        { label: "Actual (MTD from SalesAct)", data: [actualMonthRev] },
-        { label: "Projected (Full Month)", data: [projectedFullMonthRev] },
+        {
+          label: "Target (Full Month)",
+          data: [targetMonthRev],
+          backgroundColor: "rgba(54, 162, 235, 0.65)"
+        },
+        {
+          label: "Actual (MTD from SalesAct)",
+          data: [actualMonthRev],
+          backgroundColor: "rgba(34, 197, 94, 0.85)"   // Green
+        },
+        {
+          label: "Projected (Full Month)",
+          data: [projectedFullMonthRev],
+          backgroundColor: "rgba(168, 85, 247, 0.80)"  // Purple
+        },
       ],
     },
     options: {
@@ -587,7 +599,6 @@ function buildRevenuePaceChart(canvas, targetMonthRev, actualMonthRev, projected
     },
   });
 }
-
 // Hours chart: bars stacked; lines separate axis (prevents capacity adding to target)
 function buildHoursChart(
   canvas,
