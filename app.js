@@ -191,6 +191,16 @@ function projectionForAllMonth(mk, salesAct, workdaysByMonth) {
 
   return constrProj + maintProj;
 }
+// Returns date clamped forward to the first day of the current month.
+// Used so pipeline opportunities whose start date is in the past
+// don't drop hours into historical months on the chart.
+function clampToCurrentMonth(date) {
+  if (!date) return date;
+  const now = new Date();
+  const floor = new Date(now.getFullYear(), now.getMonth(), 1); // 1st of current month
+  return date < floor ? floor : date;
+}
+
 // Spread maintenance pipeline weighted hours evenly from the LATER of
 // (opportunity start month, current month) through November inclusive.
 // e.g. today = Apr-26: an opportunity starting Jan-26 spreads Apr–Nov (8 months);
@@ -935,7 +945,7 @@ function renderAll(state) {
 
   const pipeConstrMap = bucketSumByMonth(
     pipePotential.filter(p => isConstructionDivision(p.division)),
-    p => p.startDate,
+    p => clampToCurrentMonth(p.startDate),
     p => p.weightedHours,
     monthKeys
   );
