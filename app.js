@@ -515,6 +515,26 @@ async function loadSalesActMonthly(baseUrl, monthKeys) {
 
   return out;
 }
+// Load earned revenue from Aspire RevenueVariances via the backend API.
+// Returns the same shape as salesActByMonth so nothing else needs to change.
+async function loadRevenueFromApi(monthKeys) {
+  const out = {};
+  for (const mk of monthKeys) {
+    out[mk] = { constrRevMTD: 0, maintRevMTD: 0, constrHrsMTD: 0, maintHrsMTD: 0 };
+  }
+  const res = await fetch(`${API_BASE}/dashboard/sales/revenue`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Revenue API ${res.status}`);
+  const data = await res.json();
+  const rev = data.revenue || {};
+  for (const [mk, vals] of Object.entries(rev)) {
+    if (mk in out) {
+      out[mk].constrRevMTD = vals.constrRev || 0;
+      out[mk].maintRevMTD  = vals.maintRev  || 0;
+    }
+  }
+  return out;
+}
+
 async function loadOpsDailyLogWorkdays(baseUrl, monthKeys) {
   const out = {};
   for (const mk of monthKeys) {
@@ -1101,17 +1121,17 @@ async function loadAllData(state) {
     }
     setPill("workdaysStatus", false, `Workdays: Failed (${e?.message || e})`);
   }
-  // SalesAct actuals
+  // Earned revenue actuals — live from Aspire RevenueVariances
   try {
-    state.salesActByMonth = await loadSalesActMonthly(LOGBOOK_URL, state.targets.monthKeys);
-    setPill("salesActStatus", true, "SalesAct: Loaded");
+    state.salesActByMonth = await loadRevenueFromApi(state.targets.monthKeys);
+    setPill("salesActStatus", true, "Revenue: Loaded from Aspire");
   } catch (e) {
-    console.error("SalesAct load failed:", e);
+    console.error("Revenue API load failed:", e);
     state.salesActByMonth = {};
     for (const mk of state.targets.monthKeys) {
       state.salesActByMonth[mk] = { constrRevMTD: 0, maintRevMTD: 0, constrHrsMTD: 0, maintHrsMTD: 0 };
     }
-    setPill("salesActStatus", false, `SalesAct: Failed (${e?.message || e})`);
+    setPill("salesActStatus", false, `Revenue: Failed (${e?.message || e})`);
   }
 }
 
