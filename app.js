@@ -1122,17 +1122,17 @@ async function loadAllData(state) {
     }
     setPill("workdaysStatus", false, `Workdays: Failed (${e?.message || e})`);
   }
-  // Earned revenue actuals — live from Aspire RevenueVariances
+  // SalesAct actuals
   try {
-    state.salesActByMonth = await loadRevenueFromApi(state.targets.monthKeys);
-    setPill("salesActStatus", true, "Revenue: Loaded from Aspire");
+    state.salesActByMonth = await loadSalesActMonthly(LOGBOOK_URL, state.targets.monthKeys);
+    setPill("salesActStatus", true, "SalesAct: Loaded");
   } catch (e) {
-    console.error("Revenue API load failed:", e);
+    console.error("SalesAct load failed:", e);
     state.salesActByMonth = {};
     for (const mk of state.targets.monthKeys) {
       state.salesActByMonth[mk] = { constrRevMTD: 0, maintRevMTD: 0, constrHrsMTD: 0, maintHrsMTD: 0 };
     }
-    setPill("salesActStatus", false, `Revenue: Failed (${e?.message || e})`);
+    setPill("salesActStatus", false, `SalesAct: Failed (${e?.message || e})`);
   }
 }
 
