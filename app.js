@@ -38,7 +38,8 @@ function isConstructionDivision(name) {
 }
 function isMaintenanceDivision(name) {
   const s = String(name || "").toLowerCase();
-  return s.includes("maintenance") || s.includes("irrigation") || s.includes("lighting");
+  return s.includes("maintenance") || s.includes("irrigation") || s.includes("lighting")
+      || s.includes("residential") || s.includes("commercial");
 }
 function isTicketActive(status) {
   const s = String(status || "").trim().toLowerCase();
