@@ -4,16 +4,17 @@
 const LOGBOOK_URL =
   "https://script.google.com/macros/s/AKfycbxemOcHaO8jJL2JNvr6G3INrHOSahH3-1QYcsrb5IV19DG77lPUPtDkco_s9r8RFwmI/exec";
 
+// Live Aspire API backend
+const API_BASE = "https://ap-automation-production.up.railway.app";
+
 // ------------------------------------------------------------
-// Static file paths (GitHub Pages safe)
+// Static file paths (GitHub Pages safe) — targets + capacity remain manual
 // ------------------------------------------------------------
 const BASE = new URL(".", window.location.href).href;
 const FILES = {
-  targetsCsv: new URL("data/targets.csv", BASE).toString(),
-  pipelineCsv: new URL("data/pipeline.csv", BASE).toString(),
-  workTicketsXlsx: new URL("data/work_tickets.xlsx", BASE).toString(),
-  capacityCsv: new URL("data/capacity.csv", BASE).toString(),
-  };
+  targetsCsv:      new URL("data/targets.csv", BASE).toString(),
+  capacityCsv:     new URL("data/capacity.csv", BASE).toString(),
+};
 
 const TICKET_ACTIVE_STATUS_WORDS = ["open", "scheduled", "complete", "completed"];
 const WON_STATUS_WORDS = ["won", "closed won", "sold"];
@@ -409,6 +410,40 @@ async function loadWorkTickets(url) {
     estHrs: parseNumberLoose(COL_HRS ? r[COL_HRS] : 0),
     division: String(COL_DIV ? r[COL_DIV] : "").trim(),
   })).filter(t => t.schedDate && t.estHrs > 0);
+}
+
+// ------------------------------------------------------------
+// Live Aspire API loaders (replace CSV/XLSX uploads)
+// ------------------------------------------------------------
+
+async function loadPipelineFromApi() {
+  const res = await fetch(`${API_BASE}/dashboard/sales/pipeline`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Pipeline API error ${res.status}`);
+  const json = await res.json();
+  return (json.pipeline || [])
+    .map(r => ({
+      division:         String(r.division ?? "").trim(),
+      status:           String(r.status ?? "").trim(),
+      startDate:        parseDateAny(r.start_date),
+      weightedPipeline: r.weighted_pipeline ?? 0,
+      estimatedDollars: r.estimated_dollars ?? 0,
+      weightedHours:    r.weighted_hours ?? 0,
+    }))
+    .filter(r => r.startDate);
+}
+
+async function loadWorkTicketsFromApi() {
+  const res = await fetch(`${API_BASE}/dashboard/sales/work-tickets`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Work tickets API error ${res.status}`);
+  const json = await res.json();
+  return (json.work_tickets || [])
+    .map(t => ({
+      status:    String(t.status ?? "").trim(),
+      schedDate: parseDateAny(t.sched_date),
+      estHrs:    t.est_hrs ?? 0,
+      division:  String(t.division ?? "").trim(),
+    }))
+    .filter(t => t.schedDate && t.estHrs > 0);
 }
 
 async function loadSalesActMonthly(baseUrl, monthKeys) {
@@ -965,22 +1000,22 @@ async function loadAllData(state) {
     throw e;
   }
 
-  // Pipeline
+  // Pipeline — live from Aspire API
   try {
-    state.pipeline = await loadPipeline(FILES.pipelineCsv);
-    setPill("pipelineStatus", true, `Pipeline: Loaded (${state.pipeline.length})`);
+    state.pipeline = await loadPipelineFromApi();
+    setPill("pipelineStatus", true, `Pipeline: ${state.pipeline.length} opps (live)`);
   } catch (e) {
-    console.error("Pipeline failed:", e);
+    console.error("Pipeline API failed:", e);
     state.pipeline = [];
     setPill("pipelineStatus", false, `Pipeline: Failed (${e?.message || e})`);
   }
 
-  // Work tickets
+  // Work tickets — live from Aspire API
   try {
-    state.tickets = await loadWorkTickets(FILES.workTicketsXlsx);
-    setPill("ticketsStatus", true, `Work tickets: Loaded (${state.tickets.length})`);
+    state.tickets = await loadWorkTicketsFromApi();
+    setPill("ticketsStatus", true, `Work tickets: ${state.tickets.length} tickets (live)`);
   } catch (e) {
-    console.error("Work tickets failed:", e);
+    console.error("Work tickets API failed:", e);
     state.tickets = [];
     setPill("ticketsStatus", false, `Work tickets: Failed (${e?.message || e})`);
   }
