@@ -191,29 +191,41 @@ function projectionForAllMonth(mk, salesAct, workdaysByMonth) {
 
   return constrProj + maintProj;
 }
-// Spread maintenance pipeline weighted hours from Start Date month -> November inclusive
+// Spread maintenance pipeline weighted hours evenly from the LATER of
+// (opportunity start month, current month) through November inclusive.
+// e.g. today = Apr-26: an opportunity starting Jan-26 spreads Apr–Nov (8 months);
+//      one starting Jun-26 spreads Jun–Nov (6 months).
 function bucketMaintenancePipelineSpread(pipelineRows, monthKeys) {
   const out = {};
   for (const k of monthKeys) out[k] = 0;
 
+  const now      = new Date();
+  const curYear  = now.getFullYear();
+  const curMonth = now.getMonth() + 1; // 1-12
+  const endM     = 11; // November
+
   for (const p of pipelineRows) {
     if (!p.startDate) continue;
 
-    const y = p.startDate.getFullYear();
+    const y      = p.startDate.getFullYear();
     const startM = p.startDate.getMonth() + 1;
-    const endM = 11; // Nov
-    const total = Number(p.weightedHours || 0);
+    const total  = Number(p.weightedHours || 0);
 
-    if (startM > endM) {
-      const mk = monthKeyFromDate(p.startDate);
+    // Spread start = later of the opp's own start month or the current month
+    // (only apply "current month" floor for the current/past year)
+    const spreadStartM = (y <= curYear) ? Math.max(startM, curMonth) : startM;
+
+    if (spreadStartM > endM) {
+      // Starts after November — lump into its own month if it's in our chart range
+      const mk = `${y}-${String(spreadStartM).padStart(2, "0")}`;
       if (mk in out) out[mk] += total;
       continue;
     }
 
-    const monthsCount = (endM - startM + 1);
-    const perMonth = total / monthsCount;
+    const monthsCount = endM - spreadStartM + 1;
+    const perMonth    = total / monthsCount;
 
-    for (let m = startM; m <= endM; m++) {
+    for (let m = spreadStartM; m <= endM; m++) {
       const mk = `${y}-${String(m).padStart(2, "0")}`;
       if (mk in out) out[mk] += perMonth;
     }
