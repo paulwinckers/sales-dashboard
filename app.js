@@ -16,7 +16,8 @@ const FILES = {
   capacityCsv:     new URL("data/capacity.csv", BASE).toString(),
 };
 
-const TICKET_ACTIVE_STATUS_WORDS = ["open", "scheduled", "complete", "completed"];
+const TICKET_ACTIVE_STATUS_WORDS = ["open", "scheduled", "complete", "completed", "pending"];
+const TICKETS_COMPLETE_COLOR = "rgba(59, 130, 246, 0.85)";   // blue for completed
 const WON_STATUS_WORDS = ["won", "closed won", "sold"];
 const LOST_STATUS_WORDS = ["lost", "closed lost", "no sale", "cancel"];
 
@@ -42,6 +43,10 @@ function isMaintenanceDivision(name) {
 function isTicketActive(status) {
   const s = String(status || "").trim().toLowerCase();
   return TICKET_ACTIVE_STATUS_WORDS.some(w => s.includes(w));
+}
+function isTicketComplete(status) {
+  const s = String(status || "").trim().toLowerCase();
+  return s === "complete" || s === "completed";
 }
 function isWonPipelineStatus(status) {
   const s = String(status || "").trim().toLowerCase();
@@ -441,6 +446,7 @@ async function loadWorkTicketsFromApi() {
       status:    String(t.status ?? "").trim(),
       schedDate: parseDateAny(t.sched_date),
       estHrs:    t.est_hrs ?? 0,
+      actHrs:    t.act_hrs ?? 0,
       division:  String(t.division ?? "").trim(),
     }))
     .filter(t => t.schedDate && t.estHrs > 0);
@@ -635,6 +641,7 @@ function buildHoursChart(
   targetLine,
   capLine,
   barsTickets,
+  barsTicketsComplete,      // completed tickets — actual hours, shown in blue
   barsPipeline,
   barsBase = null,          // optional stacked base (maintenance placeholder)
   baseLabel = "Extra Work (Placeholder)",
@@ -656,6 +663,14 @@ function buildHoursChart(
 
   // Stacked bars
   datasets.push(
+    {
+      type: "bar",
+      label: "Completed (Actual Hrs)",
+      data: barsTicketsComplete,
+      stack: "hours",
+      backgroundColor: TICKETS_COMPLETE_COLOR,
+      yAxisID: "y",
+    },
     {
       type: "bar",
       label: "Work Tickets (Open/Scheduled)",
@@ -874,18 +889,33 @@ function renderAll(state) {
   }
 
   // --- Hours by month (tickets + pipeline weighted hours, exclude WON) ---
-  const activeTickets = state.tickets.filter(t => isTicketActive(t.status));
-  const pipePotential = state.pipeline.filter(p => !isWonPipelineStatus(p.status));
+  const completedTickets = state.tickets.filter(t => isTicketComplete(t.status));
+  const openTickets      = state.tickets.filter(t => isTicketActive(t.status) && !isTicketComplete(t.status));
+  const pipePotential    = state.pipeline.filter(p => !isWonPipelineStatus(p.status));
+
+  // Completed — use actual hours (actHrs), fall back to estHrs
+  const ticketConstrCompleteMap = bucketSumByMonth(
+    completedTickets.filter(t => isConstructionDivision(t.division)),
+    t => t.schedDate,
+    t => t.actHrs || t.estHrs,
+    monthKeys
+  );
+  const ticketMaintCompleteMap = bucketSumByMonth(
+    completedTickets.filter(t => isMaintenanceDivision(t.division) && !isConstructionDivision(t.division)),
+    t => t.schedDate,
+    t => t.actHrs || t.estHrs,
+    monthKeys
+  );
 
   const ticketConstrMap = bucketSumByMonth(
-    activeTickets.filter(t => isConstructionDivision(t.division)),
+    openTickets.filter(t => isConstructionDivision(t.division)),
     t => t.schedDate,
     t => t.estHrs,
     monthKeys
   );
 
   const ticketMaintMap = bucketSumByMonth(
-    activeTickets.filter(t => isMaintenanceDivision(t.division) && !isConstructionDivision(t.division)),
+    openTickets.filter(t => isMaintenanceDivision(t.division) && !isConstructionDivision(t.division)),
     t => t.schedDate,
     t => t.estHrs,
     monthKeys
@@ -909,8 +939,10 @@ function renderAll(state) {
   const constrCap = monthKeys.map(m => state.capacity?.constCap?.[m] || 0);
   const maintCap  = monthKeys.map(m => state.capacity?.maintCap?.[m] || 0);
 
-  const constrTickets = monthKeys.map(m => ticketConstrMap[m] || 0);
-  const maintTickets  = monthKeys.map(m => ticketMaintMap[m] || 0);
+  const constrTickets         = monthKeys.map(m => ticketConstrMap[m] || 0);
+  const maintTickets          = monthKeys.map(m => ticketMaintMap[m] || 0);
+  const constrTicketsComplete = monthKeys.map(m => ticketConstrCompleteMap[m] || 0);
+  const maintTicketsComplete  = monthKeys.map(m => ticketMaintCompleteMap[m] || 0);
   const constrPipe = monthKeys.map(m => pipeConstrMap[m] || 0);
   const maintPipe  = monthKeys.map(m => pipeMaintMap[m] || 0);
 
@@ -930,6 +962,7 @@ chartMaint = destroy(chartMaint);
     constrTarget,
     constrCap,
     constrTickets,
+    constrTicketsComplete,
     constrPipe
   );
 
@@ -939,6 +972,7 @@ chartMaint = buildHoursChart(
   maintTarget,
   maintCap,
   maintTickets,
+  maintTicketsComplete,
   maintPipe,
   maintExtra,                          // ✅ base purple block
   "Extra Work (Placeholder)",
@@ -953,8 +987,8 @@ chartMaint = buildHoursChart(
   const next3ConstrTarget = next3.map(m => state.targets.constrHours[m] || 0);
   const next3MaintTarget  = next3.map(m => state.targets.maintHours[m] || 0);
 
-  const next3ConstrWork = next3.map(m => ticketConstrMap[m] || 0);
-  const next3MaintWork  = next3.map(m => ticketMaintMap[m] || 0);
+  const next3ConstrWork = next3.map(m => (ticketConstrMap[m] || 0) + (ticketConstrCompleteMap[m] || 0));
+  const next3MaintWork  = next3.map(m => (ticketMaintMap[m] || 0) + (ticketMaintCompleteMap[m] || 0));
 
   renderCoverageKpi("kpiCoverageConstr", next3, next3ConstrTarget, next3ConstrWork);
   renderCoverageKpi("kpiCoverageMaint",  next3, next3MaintTarget,  next3MaintWork);
